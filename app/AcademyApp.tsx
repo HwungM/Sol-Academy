@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   diagnosticQuestions,
   modules,
+  passScore,
   researchCutoff,
   sourceMap,
   sources,
@@ -50,6 +51,17 @@ type OperatorStats = {
   correctDrills: number;
 };
 
+type CurriculumStats = {
+  corePassed: number;
+  coreTotal: number;
+  corePct: number;
+  coreReady: boolean;
+  bonusPassed: number;
+  bonusTotal: number;
+  nextCore?: Module;
+  nextBonus?: Module;
+};
+
 const emptyProgress: Progress = {
   completed: [],
   scores: {},
@@ -76,6 +88,10 @@ const operatorRanks: OperatorRank[] = [
   { code: "R6", name: "Systems Operator", min: 2100 },
 ];
 
+const weekendCoreModules = modules.filter((module) => module.track === "Weekend Core");
+const bonusArsenalModules = modules.filter((module) => module.track === "Bonus Arsenal");
+const weekendLessonMinutes = 455;
+
 const pct = (value: number) => `${Math.round(value)}%`;
 const formatNumber = (value: number, digits = 2) =>
   Number.isFinite(value)
@@ -101,6 +117,21 @@ function getOperatorStats(progress: Progress): OperatorStats {
   return { xp, rank, nextRank, rankProgress, answeredDrills, correctDrills };
 }
 
+function getCurriculumStats(progress: Progress): CurriculumStats {
+  const corePassed = weekendCoreModules.filter((module) => progress.completed.includes(module.id)).length;
+  const bonusPassed = bonusArsenalModules.filter((module) => progress.completed.includes(module.id)).length;
+  return {
+    corePassed,
+    coreTotal: weekendCoreModules.length,
+    corePct: (corePassed / weekendCoreModules.length) * 100,
+    coreReady: corePassed === weekendCoreModules.length,
+    bonusPassed,
+    bonusTotal: bonusArsenalModules.length,
+    nextCore: weekendCoreModules.find((module) => !progress.completed.includes(module.id)),
+    nextBonus: bonusArsenalModules.find((module) => !progress.completed.includes(module.id)),
+  };
+}
+
 function useCourseProgress() {
   const [progress, setProgress] = useState<Progress>(emptyProgress);
   const [hydrated, setHydrated] = useState(false);
@@ -111,11 +142,13 @@ function useCourseProgress() {
         const saved = window.localStorage.getItem("sol-academy-progress-v1");
         if (saved) {
           const parsed = JSON.parse(saved) as Partial<Progress>;
+          const savedScores = parsed.scores ?? {};
+          const passedFromScores = Object.entries(savedScores).filter(([, score]) => score >= passScore).map(([moduleId]) => moduleId);
           setProgress({
             ...emptyProgress,
             ...parsed,
-            completed: parsed.completed ?? [],
-            scores: parsed.scores ?? {},
+            completed: Array.from(new Set([...(parsed.completed ?? []), ...passedFromScores])),
+            scores: savedScores,
             notes: parsed.notes ?? {},
             drillAnswers: parsed.drillAnswers ?? {},
             vodEntries: parsed.vodEntries ?? [],
@@ -146,7 +179,8 @@ export default function AcademyApp() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [labTab, setLabTab] = useState<LabTab>("calculators");
 
-  const completion = (progress.completed.length / modules.length) * 100;
+  const curriculumStats = useMemo(() => getCurriculumStats(progress), [progress]);
+  const completion = curriculumStats.corePct;
   const operatorStats = useMemo(() => getOperatorStats(progress), [progress]);
   const activeModule = modules.find((item) => item.id === activeModuleId) ?? modules[0];
 
@@ -171,14 +205,14 @@ export default function AcademyApp() {
   const saveScore = (moduleId: string, score: number) => {
     setProgress((current) => {
       const best = Math.max(current.scores[moduleId] ?? 0, score);
-      const completed = best >= 80
+      const completed = best >= passScore
         ? Array.from(new Set([...current.completed, moduleId]))
         : current.completed;
       return { ...current, scores: { ...current.scores, [moduleId]: best }, completed };
     });
   };
 
-  const nextIncomplete = modules.find((item) => !progress.completed.includes(item.id)) ?? modules.at(-1)!;
+  const nextIncomplete = curriculumStats.nextCore ?? curriculumStats.nextBonus ?? modules.at(-1)!;
 
   return (
     <div className="academy-shell">
@@ -207,10 +241,10 @@ export default function AcademyApp() {
         </nav>
 
         <div className="sidebar-progress">
-          <div className="progress-ring" role="progressbar" aria-label="Course completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completion)} style={{ "--progress": `${completion * 3.6}deg` } as React.CSSProperties}>
+          <div className="progress-ring" role="progressbar" aria-label="Weekend Core completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completion)} style={{ "--progress": `${completion * 3.6}deg` } as React.CSSProperties}>
             <span>{Math.round(completion)}%</span>
           </div>
-          <div><strong>{operatorStats.rank.name}</strong><small>{operatorStats.xp} XP · {progress.completed.length}/{modules.length} modules</small></div>
+          <div><strong>{curriculumStats.coreReady ? "VOD LITERATE" : operatorStats.rank.name}</strong><small>{curriculumStats.corePassed}/{curriculumStats.coreTotal} core · {curriculumStats.bonusPassed}/{curriculumStats.bonusTotal} bonus</small></div>
         </div>
 
         <div className="sidebar-note">
@@ -243,6 +277,7 @@ export default function AcademyApp() {
                 navigate={navigate}
                 openLab={openLab}
                 stats={operatorStats}
+                curriculum={curriculumStats}
                 setProgress={setProgress}
               />
             )}
@@ -283,6 +318,7 @@ function Dashboard({
   navigate,
   openLab,
   stats,
+  curriculum,
   setProgress,
 }: {
   progress: Progress;
@@ -292,6 +328,7 @@ function Dashboard({
   navigate: (view: View) => void;
   openLab: (tab: LabTab) => void;
   stats: OperatorStats;
+  curriculum: CurriculumStats;
   setProgress: React.Dispatch<React.SetStateAction<Progress>>;
 }) {
   const nextDrill = drills.find((drill) => progress.drillAnswers[drill.id] === undefined);
@@ -300,28 +337,28 @@ function Dashboard({
     return courseModule ? progress.completed.includes(courseModule.id) : false;
   });
   const badges = [
-    { mark: "SL", label: "Screen literate", unlocked: (progress.diagnosticScore ?? 0) >= 80 },
+    { mark: "VL", label: "VOD literate", unlocked: curriculum.coreReady },
     { mark: "MM", label: "Market mechanic", unlocked: hasPassed([1, 2, 3, 4]) },
     { mark: "WC", label: "Wallet cartographer", unlocked: hasPassed([5, 6]) },
-    { mark: "RF", label: "Risk first", unlocked: hasPassed([9]) },
-    { mark: "TA", label: "Tape analyst", unlocked: progress.vodEntries.length >= 3 },
+    { mark: "RF", label: "Risk first", unlocked: hasPassed([8]) },
+    { mark: "TA", label: "Tape analyst", unlocked: hasPassed([7]) && progress.vodEntries.length >= 3 },
   ];
 
   return (
     <div className="page dashboard-page">
       <section className="hero-grid">
         <div className="hero-copy">
-          <p className="eyebrow"><span>◆</span> THE OPERATOR’S PRE-VOD SYSTEM</p>
-          <h1>Read the chain.<br /><em>Read the crowd.</em><br />Control the downside.</h1>
-          <p className="hero-lead">A ruthless, evidence-first curriculum for understanding Solana memecoin markets before you copy a trader, touch a bot, or mistake a screenshot for a strategy.</p>
+          <p className="eyebrow"><span>◆</span> WEEKEND CORE // VOD LITERACY</p>
+          <h1>Understand the screen.<br /><em>By Sunday night.</em><br />Build your edge next.</h1>
+          <p className="hero-lead">Eight focused modules teach the minimum mechanics, wallet evidence, crowd behavior, and risk logic needed to follow fast memecoin VODs. Everything afterward is your bonus arsenal.</p>
           <div className="hero-actions">
-            <button className="primary-action" onClick={() => openModule(nextModule.id)}>Continue: {nextModule.shortTitle}<span>→</span></button>
+            <button className="primary-action" onClick={() => openModule(nextModule.id)}>{curriculum.coreReady ? "Enter Bonus" : "Continue Weekend Core"}: {nextModule.shortTitle}<span>→</span></button>
             <button className="ghost-action" onClick={() => navigate("drills")}>Test my screen literacy</button>
           </div>
           <div className="hero-proof">
-            <span><strong>{modules.length}</strong> sequenced modules</span>
-            <span><strong>{glossary.length}</strong> field terms</span>
-            <span><strong>{drills.length}</strong> decision drills</span>
+            <span><strong>{curriculum.coreTotal}</strong> core modules</span>
+            <span><strong>{Math.floor(weekendLessonMinutes / 60)}H{String(weekendLessonMinutes % 60).padStart(2, "0")}</strong> lesson clock</span>
+            <span><strong>{curriculum.bonusTotal}</strong> bonus modules</span>
           </div>
         </div>
 
@@ -350,7 +387,7 @@ function Dashboard({
         <div className="rank-console">
           <div className="rank-code">{stats.rank.code}</div>
           <div className="rank-copy">
-            <span>OPERATOR RANK</span>
+            <span>TRAINING RANK</span>
             <h2>{stats.rank.name}</h2>
             <p>{stats.nextRank ? `${stats.nextRank.min - stats.xp} XP TO ${stats.nextRank.name.toUpperCase()}` : "MAXIMUM ACADEMY RANK"}</p>
           </div>
@@ -360,7 +397,7 @@ function Dashboard({
 
         <div className="mission-deck">
           <button onClick={() => openModule(nextModule.id)}>
-            <span>PRIMARY MISSION</span><strong>{progress.completed.length === modules.length ? "Replay any module" : `Clear M${String(nextModule.number).padStart(2, "0")}`}</strong><small>+100 XP · {nextModule.shortTitle}</small><b>OPEN →</b>
+            <span>{curriculum.coreReady ? "BONUS MISSION" : "WEEKEND MISSION"}</span><strong>{progress.completed.length === modules.length ? "Replay any module" : `Clear M${String(nextModule.number).padStart(2, "0")}`}</strong><small>+100 XP · {nextModule.shortTitle}</small><b>OPEN →</b>
           </button>
           <button onClick={() => navigate("drills")} className={!nextDrill ? "cleared" : ""}>
             <span>FIELD READ</span><strong>{nextDrill ? nextDrill.label : "Drill deck cleared"}</strong><small>{stats.correctDrills}/{drills.length} clean reads</small><b>{nextDrill ? "RUN →" : "REPLAY →"}</b>
@@ -378,18 +415,18 @@ function Dashboard({
 
       <section className="dashboard-strip">
         <div className="completion-card">
-          <div className="section-label">YOUR RUN</div>
+          <div className="section-label">WEEKEND CORE</div>
           <div className="completion-head"><strong>{Math.round(completion)}%</strong><span>VOD readiness</span></div>
           <div className="wide-progress"><i style={{ width: `${completion}%` }} /></div>
-          <p>{progress.completed.length === 0 ? "Start with the game map. Speed will make sense later." : `${progress.completed.length} modules passed at 80% or better.`}</p>
+          <p>{curriculum.coreReady ? "VOD LITERATE. You can now follow the screen; the Bonus Arsenal deepens your method." : curriculum.corePassed === 0 ? "Start with the game map. Budget roughly five focused hours per day." : `${curriculum.corePassed}/${curriculum.coreTotal} core modules passed at ${passScore}% or better.`}</p>
         </div>
         <div className="reality-card">
-          <div className="section-label">THE REALITY CHECK</div>
-          <blockquote>“A 70 ms bot that buys every new token is a sophisticated machine for buying the base rate.”</blockquote>
-          <p>Selection → sizing → execution → exit → accounting. Miss one layer and the screenshot lies.</p>
+          <div className="section-label">THE EDGE FACTORY</div>
+          <blockquote>Observe → define → journal → test → alert → automate.</blockquote>
+          <p>The design space is enormous because you can combine a universe, state, evidence rule, trigger, size, and exit. Profitable edges are scarce, though: a bot multiplies a measured method; it does not supply one.</p>
         </div>
         <div className="continue-card">
-          <div className="section-label">NEXT GATE</div>
+          <div className="section-label">{curriculum.coreReady ? "BONUS GATE" : "NEXT CORE GATE"}</div>
           <span className="module-number">{String(nextModule.number).padStart(2, "0")}</span>
           <div><strong>{nextModule.shortTitle}</strong><small>{nextModule.duration} · {nextModule.difficulty}</small></div>
           <button onClick={() => openModule(nextModule.id)} aria-label={`Open ${nextModule.title}`}>→</button>
@@ -398,18 +435,18 @@ function Dashboard({
 
       <section className="phase-preview">
         <div className="section-heading">
-          <div><p className="eyebrow">THE LEARNING ORDER</p><h2>Three phases. No skipped foundations.</h2></div>
+          <div><p className="eyebrow">THE WEEKEND ROUTE</p><h2>Understand first. Specialize afterward.</h2></div>
           <button onClick={() => navigate("path")}>View full curriculum →</button>
         </div>
         <div className="phase-cards">
           {[
-            { phase: "Foundation", range: "01—04", text: "Market structure, math, lifecycle, and screen literacy.", color: "violet" },
-            { phase: "Operator", range: "05—09", text: "Wallet evidence, narratives, tape, risk, and public setups.", color: "green" },
-            { phase: "Systems", range: "10—12", text: "Execution, automation, replay, and VOD capstone.", color: "amber" },
+            { phase: "Saturday", range: "01—04 · 3H20", text: "Decode the game, money, lifecycle, and terminal screen.", color: "violet", moduleNumbers: [1, 2, 3, 4] },
+            { phase: "Sunday", range: "05—08 · 4H15", text: "Decode wallets, narratives, tape, risk, and decisions.", color: "green", moduleNumbers: [5, 6, 7, 8] },
+            { phase: "Bonus Arsenal", range: "09—12 · OPTIONAL", text: "Study setup families, execution, automation, and full VOD replay.", color: "amber", moduleNumbers: [9, 10, 11, 12] },
           ].map((item) => (
             <article className={`phase-card ${item.color}`} key={item.phase}>
               <span>{item.range}</span><h3>{item.phase}</h3><p>{item.text}</p>
-              <b>{modules.filter((module) => module.phase === item.phase).filter((module) => progress.completed.includes(module.id)).length}/{modules.filter((module) => module.phase === item.phase).length} passed</b>
+              <b>{modules.filter((module) => item.moduleNumbers.includes(module.number)).filter((module) => progress.completed.includes(module.id)).length}/{item.moduleNumbers.length} passed</b>
             </article>
           ))}
         </div>
@@ -457,28 +494,52 @@ function Diagnostic({ progress, setProgress }: { progress: Progress; setProgress
 }
 
 function Curriculum({ progress, openModule }: { progress: Progress; openModule: (id: string) => void }) {
+  const curriculum = getCurriculumStats(progress);
+  const renderModuleCards = (courseModules: Module[]) => (
+    <div className="module-grid">
+      {courseModules.map((courseModule) => {
+        const completed = progress.completed.includes(courseModule.id);
+        const score = progress.scores[courseModule.id];
+        return (
+          <article className={`module-card ${completed ? "complete" : ""}`} key={courseModule.id}>
+            <div className="module-card-top"><span>{String(courseModule.number).padStart(2, "0")}</span><b>{completed ? "PASSED" : courseModule.track === "Weekend Core" ? `CORE · DAY ${courseModule.weekendDay}` : "BONUS"}</b></div>
+            <h3>{courseModule.title}</h3><p>{courseModule.outcome}</p>
+            <div className="module-meta"><span>{courseModule.duration}</span><span>{courseModule.quiz.length} checks</span>{score !== undefined && <span>Best {score}%</span>}</div>
+            <button onClick={() => openModule(courseModule.id)}>{completed ? "Review module" : "Open module"}<span>→</span></button>
+          </article>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="page curriculum-page">
-      <PageLead eyebrow="THE CURRICULUM" title="Learn the market in dependency order." body="Every module ends with a scored knowledge check. Pass at 80% to mark it complete; jump anywhere when you need a reference." />
-      {(["Foundation", "Operator", "Systems"] as const).map((phase) => (
-        <section className="curriculum-phase" key={phase}>
-          <div className="phase-divider"><span>{phase}</span><i /></div>
-          <div className="module-grid">
-            {modules.filter((module) => module.phase === phase).map((module) => {
-              const completed = progress.completed.includes(module.id);
-              const score = progress.scores[module.id];
-              return (
-                <article className={`module-card ${completed ? "complete" : ""}`} key={module.id}>
-                  <div className="module-card-top"><span>{String(module.number).padStart(2, "0")}</span><b>{completed ? "PASSED" : module.difficulty.toUpperCase()}</b></div>
-                  <h3>{module.title}</h3><p>{module.outcome}</p>
-                  <div className="module-meta"><span>{module.duration}</span><span>{module.quiz.length} checks</span>{score !== undefined && <span>Best {score}%</span>}</div>
-                  <button onClick={() => openModule(module.id)}>{completed ? "Review module" : "Open module"}<span>→</span></button>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      <PageLead eyebrow="WEEKEND CORE + BONUS ARSENAL" title="Understand the trenches this weekend." body={`Finish Modules 01–08 in ${Math.floor(weekendLessonMinutes / 60)}h ${weekendLessonMinutes % 60}m of lesson time—roughly 9–10 focused hours with checks and breaks. Modules 09–12 deepen the craft; they are not prerequisites for understanding a VOD.`} />
+
+      <section className="weekend-status-panel">
+        <div><span>WEEKEND STATUS</span><strong>{curriculum.coreReady ? "VOD LITERATE" : `${curriculum.corePassed}/${curriculum.coreTotal} CORE CLEARED`}</strong><p>{curriculum.coreReady ? "You have cleared the comprehension path. Move into the Bonus Arsenal to discover, test, and automate a method." : "Pass each core knowledge check at 75% or better. The goal is screen legibility—not instant profitability."}</p></div>
+        <div className="weekend-meter" role="progressbar" aria-label="Weekend Core completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(curriculum.corePct)}><span>{Math.round(curriculum.corePct)}%</span><i><b style={{ width: `${curriculum.corePct}%` }} /></i></div>
+      </section>
+
+      <section className="curriculum-phase">
+        <div className="phase-divider"><span>Saturday · Decode the market and screen · 3h20 lessons</span><i /></div>
+        {renderModuleCards(weekendCoreModules.filter((module) => module.weekendDay === 1))}
+      </section>
+      <section className="curriculum-phase">
+        <div className="phase-divider"><span>Sunday · Decode participants and decisions · 4h15 lessons</span><i /></div>
+        {renderModuleCards(weekendCoreModules.filter((module) => module.weekendDay === 2))}
+      </section>
+
+      <section className="edge-loop-panel">
+        <div><p className="eyebrow">THE BRIDGE TO YOUR OWN METHOD</p><h2>There is no single playbook to copy.</h2><p>Choose a universe, wait for a state, require evidence, define a trigger, control size, and specify the exit. That combination is your hypothesis—not yet your edge.</p></div>
+        <ol>{["Observe", "Define", "Journal", "Test", "Alert", "Automate"].map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, "0")}</span><strong>{step}</strong>{index < 5 && <b>→</b>}</li>)}</ol>
+        <aside><strong>THE RULE</strong><p>If you cannot execute it manually, label it consistently, and measure it after costs, you are not ready to automate it.</p></aside>
+      </section>
+
+      <section className="curriculum-phase bonus-phase">
+        <div className="phase-divider"><span>Bonus Arsenal · Specialize after literacy</span><i /></div>
+        {renderModuleCards(bonusArsenalModules)}
+      </section>
     </div>
   );
 }
@@ -506,7 +567,7 @@ function ModuleView({
       <button className="back-link" onClick={back}>← Curriculum</button>
       <header className="module-hero">
         <div className="module-index">MODULE {String(module.number).padStart(2, "0")} / {String(modules.length).padStart(2, "0")}</div>
-        <p className="eyebrow">{module.phase.toUpperCase()} · {module.duration.toUpperCase()}</p>
+        <p className="eyebrow">{module.track.toUpperCase()}{module.weekendDay ? ` · DAY ${module.weekendDay}` : ""} · {module.duration.toUpperCase()}</p>
         <h1>{module.title}</h1>
         <p>{module.kicker}</p>
         <div className="outcome-box"><span>OUTCOME</span><p>{module.outcome}</p><b>{passed ? "PASSED" : (progress.scores[module.id] !== undefined ? `BEST ${progress.scores[module.id]}%` : "NOT SCORED")}</b></div>
@@ -540,7 +601,7 @@ function ModuleView({
             <textarea aria-label={`Notes for ${module.title}`} value={progress.notes[module.id] ?? ""} onChange={(event) => saveNote(event.target.value)} placeholder="What changed in how you see the screen? What still feels fuzzy? Notes save on this device." />
           </section>
 
-          {next && <button className="next-module" onClick={() => openModule(next.id)}><span>NEXT MODULE</span><strong>{String(next.number).padStart(2, "0")} · {next.title}</strong><b>→</b></button>}
+          {next && <button className="next-module" onClick={() => openModule(next.id)}><span>{module.number === 8 ? "ENTER BONUS ARSENAL" : "NEXT MODULE"}</span><strong>{String(next.number).padStart(2, "0")} · {next.title}</strong><b>→</b></button>}
         </article>
 
         <aside className="lesson-rail">
@@ -560,11 +621,11 @@ function Quiz({ questions, previousScore, onScore }: { questions: Question[]; pr
   const retry = () => { setAnswers({}); setSubmitted(false); };
   return (
     <section className="quiz-panel module-quiz">
-      <div className="quiz-head"><div><p className="section-kicker">KNOWLEDGE CHECK</p><h2>Prove the distinction.</h2></div><span>PASS ≥ 80%</span></div>
+      <div className="quiz-head"><div><p className="section-kicker">KNOWLEDGE CHECK</p><h2>Prove the distinction.</h2></div><span>PASS ≥ {passScore}%</span></div>
       {previousScore !== undefined && <p className="previous-score">Current best: {previousScore}%</p>}
       {questions.map((item, index) => <QuestionBlock key={item.id} question={item} index={index} selected={answers[item.id]} submitted={submitted} onSelect={(answer) => !submitted && setAnswers((current) => ({ ...current, [item.id]: answer }))} />)}
       {!submitted ? <button className="primary-action full" disabled={Object.keys(answers).length !== questions.length} onClick={submit}>Submit module check <span>→</span></button> : (
-        <div className={`score-result ${score >= 80 ? "pass" : "review"}`} role="status"><span>{score}%</span><div>{score >= 80 && <b className="xp-award">MODULE CLEAR · {(previousScore ?? 0) < 80 ? "+100 XP" : "BEST SCORE SAVED"}</b>}<strong>{score >= 80 ? "Module passed" : "Model update required"}</strong><p>{score >= 80 ? "The module is now counted in VOD readiness." : "A wrong answer is useful when its explanation changes your model."}</p><button onClick={retry}>Try again</button></div></div>
+        <div className={`score-result ${score >= passScore ? "pass" : "review"}`} role="status"><span>{score}%</span><div>{score >= passScore && <b className="xp-award">MODULE CLEAR · {(previousScore ?? 0) < passScore ? "+100 XP" : "BEST SCORE SAVED"}</b>}<strong>{score >= passScore ? "Module passed" : "Model update required"}</strong><p>{score >= passScore ? "The module is now counted in VOD readiness." : "A wrong answer is useful when its explanation changes your model."}</p><button onClick={retry}>Try again</button></div></div>
       )}
     </section>
   );

@@ -39,6 +39,8 @@ export type LessonSection = {
 export type Module = {
   id: string;
   number: number;
+  track: "Weekend Core" | "Bonus Arsenal";
+  weekendDay?: 1 | 2;
   phase: "Foundation" | "Operator" | "Systems";
   title: string;
   shortTitle: string;
@@ -87,6 +89,7 @@ export type HistoricalCase = {
 };
 
 export const researchCutoff = "August 24, 2026";
+export const passScore = 75;
 
 export const sources: Source[] = [
   {
@@ -492,6 +495,8 @@ export const modules: Module[] = [
   {
     id: "game-map",
     number: 1,
+    track: "Weekend Core",
+    weekendDay: 1,
     phase: "Foundation",
     title: "The game map & the base rate",
     shortTitle: "Game map",
@@ -536,25 +541,26 @@ export const modules: Module[] = [
         sources: ["coingecko-state", "coingecko-q1"],
       },
       {
-        eyebrow: "Course contract",
-        title: "What competence looks like",
+        eyebrow: "Weekend contract",
+        title: "Literacy first, your own edge second",
         body: [
-          "At the end of this academy you should be able to pause a VOD and describe the visible opportunity, missing information, thesis, invalidation, size logic, transaction risk, and exit logic. You do not need to predict every candle.",
-          "Your first goal is legibility. Your second is a journaled manual edge. Automation is a later multiplier—not a substitute for either.",
+          "After the Weekend Core you should be able to pause a VOD and describe the visible opportunity, missing information, thesis, invalidation, size logic, transaction risk, and exit logic. You do not need to predict every candle or copy the trader's exact method.",
+          "The method design space is enormous because an edge can live in the universe you scan, information you collect, state you wait for, evidence you require, trigger you act on, size you deploy, or exit you use. Profitable edges are not automatic: every combination must survive evidence, costs, and changing market regimes. Your first goal is legibility; your second is a journaled manual edge; automation is a later multiplier.",
         ],
         bullets: [
           "Explain the market state without using ‘looks good.’",
           "Name the evidence and the counter-explanation.",
           "State where you are wrong before entry.",
-          "Measure net expectancy by setup, including non-trades and costs.",
+          "Turn one repeated observation into entry, skip, invalidation, exit, and sizing rules.",
         ],
+        formula: "observe → define → journal → test → alert → guarded automation",
       },
     ],
     takeaways: [
       "Interrogate the production function behind PnL.",
       "Use 2024–January 2025 as the main historical tape.",
       "Your first target is screen literacy, not speed.",
-      "Never infer repeatability from a screenshot.",
+      "Bots multiply a defined, measured method; they do not invent one.",
     ],
     quiz: [
       q("gm1", "Which question best begins an evaluation of a ‘500 SOL/day’ claim?", ["Which bot do I buy?", "Which production function generated it?", "What ticker was traded?", "Was the candle green?"], 1, "The category—public trading, creator fees, infrastructure, transfers, or coordinated operations—determines whether the result is comparable or copyable."),
@@ -566,6 +572,8 @@ export const modules: Module[] = [
   {
     id: "money-math",
     number: 2,
+    track: "Weekend Core",
+    weekendDay: 1,
     phase: "Foundation",
     title: "SOL, token math & executable value",
     shortTitle: "Money math",
@@ -634,6 +642,8 @@ export const modules: Module[] = [
   {
     id: "lifecycle",
     number: 3,
+    track: "Weekend Core",
+    weekendDay: 1,
     phase: "Foundation",
     title: "The token lifecycle & trading regimes",
     shortTitle: "Lifecycle",
@@ -704,6 +714,8 @@ export const modules: Module[] = [
   {
     id: "terminal",
     number: 4,
+    track: "Weekend Core",
+    weekendDay: 1,
     phase: "Foundation",
     title: "Terminal literacy without dashboard superstition",
     shortTitle: "Terminal literacy",
@@ -772,6 +784,8 @@ export const modules: Module[] = [
   {
     id: "wallets",
     number: 5,
+    track: "Weekend Core",
+    weekendDay: 2,
     phase: "Operator",
     title: "Wallet forensics & evidence graphs",
     shortTitle: "Wallet forensics",
@@ -843,6 +857,8 @@ export const modules: Module[] = [
   {
     id: "narrative",
     number: 6,
+    track: "Weekend Core",
+    weekendDay: 2,
     phase: "Operator",
     title: "Narrative, metas & the OG problem",
     shortTitle: "Narrative & OG",
@@ -912,6 +928,8 @@ export const modules: Module[] = [
   {
     id: "tape",
     number: 7,
+    track: "Weekend Core",
+    weekendDay: 2,
     phase: "Operator",
     title: "Tape, momentum & crowd behavior",
     shortTitle: "Tape & momentum",
@@ -979,6 +997,8 @@ export const modules: Module[] = [
   {
     id: "risk",
     number: 8,
+    track: "Weekend Core",
+    weekendDay: 2,
     phase: "Operator",
     title: "Risk, sizing & strategy expectancy",
     shortTitle: "Risk & sizing",
@@ -1047,13 +1067,14 @@ export const modules: Module[] = [
   {
     id: "setups",
     number: 9,
+    track: "Bonus Arsenal",
     phase: "Operator",
-    title: "Four public setups worth studying",
-    shortTitle: "Setup library",
+    title: "Four setup families—not a finite menu",
+    shortTitle: "Setup families",
     kicker: "One setup, one horizon, one invalidation.",
     duration: "75 min",
     difficulty: "Core",
-    outcome: "Frame launch, migration, post-migration momentum, and wallet-confirmation trades without mixing their signals or horizons.",
+    outcome: "Use four public setup families as examples, then recombine universe, state, evidence, trigger, risk, and exit into a method you can test yourself.",
     prerequisites: ["risk"],
     sections: [
       {
@@ -1108,6 +1129,7 @@ export const modules: Module[] = [
   {
     id: "execution",
     number: 10,
+    track: "Bonus Arsenal",
     phase: "Systems",
     title: "Execution: from signal to confirmed position",
     shortTitle: "Execution",
@@ -1176,6 +1198,7 @@ export const modules: Module[] = [
   {
     id: "automation",
     number: 11,
+    track: "Bonus Arsenal",
     phase: "Systems",
     title: "Bots, automation & defensible architecture",
     shortTitle: "Automation",
@@ -1244,6 +1267,7 @@ export const modules: Module[] = [
   {
     id: "vod-capstone",
     number: 12,
+    track: "Bonus Arsenal",
     phase: "Systems",
     title: "Historical replay, VOD study & capstone",
     shortTitle: "VOD capstone",

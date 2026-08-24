@@ -28,7 +28,7 @@ test("server-renders the Sol Academy product shell", async () => {
   assert.doesNotMatch(html, /react-loading-skeleton/);
 
   const academySource = await readFile(new URL("../app/AcademyApp.tsx", import.meta.url), "utf8");
-  assert.match(academySource, /Read the chain/);
+  assert.match(academySource, /Understand the screen/);
   assert.match(academySource, /DECISION STACK/);
 });
 
@@ -44,6 +44,10 @@ test("ships the complete course corpus without private screenshot material", asy
 
   const moduleBlock = course.slice(course.indexOf("export const modules"), course.indexOf("export const diagnosticQuestions"));
   assert.equal((moduleBlock.match(/\n\s+number:\s\d+,/g) ?? []).length, 12);
+  assert.equal((moduleBlock.match(/track:\s"Weekend Core"/g) ?? []).length, 8);
+  assert.equal((moduleBlock.match(/track:\s"Bonus Arsenal"/g) ?? []).length, 4);
+  assert.equal((moduleBlock.match(/weekendDay:\s1/g) ?? []).length, 4);
+  assert.equal((moduleBlock.match(/weekendDay:\s2/g) ?? []).length, 4);
   assert.ok((moduleBlock.match(/\n\s+quiz:\s\[/g) ?? []).length >= 12);
   assert.ok((labs.match(/\{ term:/g) ?? []).length >= 80);
 
@@ -56,9 +60,13 @@ test("ships the complete course corpus without private screenshot material", asy
   assert.match(app, /function VodNotebook/);
   assert.match(app, /function Calculators/);
   assert.match(app, /function getOperatorStats/);
-  assert.match(app, /OPERATOR RANK/);
+  assert.match(app, /TRAINING RANK/);
   assert.match(app, /SIMULATION ONLINE/);
   assert.match(app, /MODULE CLEAR/);
+  assert.match(app, /WEEKEND CORE/);
+  assert.match(app, /BONUS ARSENAL/);
+  assert.match(app, /VOD LITERATE/);
+  assert.match(app, /Observe.*Define.*Journal.*Test.*Alert.*Automate/s);
   assert.match(page, /<AcademyApp \/>/);
   assert.match(layout, /Sol Academy/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
