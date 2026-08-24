@@ -55,6 +55,10 @@ test("ships the complete course corpus without private screenshot material", asy
   assert.match(app, /localStorage\.setItem\("sol-academy-progress-v1"/);
   assert.match(app, /function VodNotebook/);
   assert.match(app, /function Calculators/);
+  assert.match(app, /function getOperatorStats/);
+  assert.match(app, /OPERATOR RANK/);
+  assert.match(app, /SIMULATION ONLINE/);
+  assert.match(app, /MODULE CLEAR/);
   assert.match(page, /<AcademyApp \/>/);
   assert.match(layout, /Sol Academy/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);

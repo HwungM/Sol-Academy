@@ -7,6 +7,7 @@ This first release includes:
 - 12 sequenced modules, from market mechanics through manual-edge validation and automation readiness
 - 48 graded questions plus an entry diagnostic
 - decision drills built around incomplete, adversarial market data
+- learning-based XP, six operator ranks, missions, and mastery achievements
 - market-cap, liquidity, price-impact, position-sizing, and expectancy calculators
 - historical tape studies covering the late-2023 through early-2025 Solana cycle and newer 2026 evidence
 - a searchable trench-language glossary

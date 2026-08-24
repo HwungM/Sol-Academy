@@ -35,6 +35,21 @@ type Progress = {
   vodEntries: VodEntry[];
 };
 
+type OperatorRank = {
+  code: string;
+  name: string;
+  min: number;
+};
+
+type OperatorStats = {
+  xp: number;
+  rank: OperatorRank;
+  nextRank?: OperatorRank;
+  rankProgress: number;
+  answeredDrills: number;
+  correctDrills: number;
+};
+
 const emptyProgress: Progress = {
   completed: [],
   scores: {},
@@ -52,11 +67,39 @@ const navItems: { view: View; label: string; mark: string }[] = [
   { view: "sources", label: "Evidence library", mark: "06" },
 ];
 
+const operatorRanks: OperatorRank[] = [
+  { code: "R1", name: "Observer", min: 0 },
+  { code: "R2", name: "Scanner", min: 250 },
+  { code: "R3", name: "Chain Reader", min: 600 },
+  { code: "R4", name: "Tape Reader", min: 1000 },
+  { code: "R5", name: "Risk Operator", min: 1500 },
+  { code: "R6", name: "Systems Operator", min: 2100 },
+];
+
 const pct = (value: number) => `${Math.round(value)}%`;
 const formatNumber = (value: number, digits = 2) =>
   Number.isFinite(value)
     ? new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value)
     : "—";
+
+function getOperatorStats(progress: Progress): OperatorStats {
+  const answeredDrills = drills.filter((drill) => progress.drillAnswers[drill.id] !== undefined).length;
+  const correctDrills = drills.filter((drill) => progress.drillAnswers[drill.id] === drill.answer).length;
+  const xp =
+    progress.completed.length * 100 +
+    answeredDrills * 10 +
+    correctDrills * 40 +
+    (progress.diagnosticScore !== undefined ? 50 : 0) +
+    Math.min(progress.vodEntries.length, 8) * 75;
+  const rankIndex = operatorRanks.findLastIndex((rank) => xp >= rank.min);
+  const rank = operatorRanks[Math.max(rankIndex, 0)];
+  const nextRank = operatorRanks[rankIndex + 1];
+  const rankProgress = nextRank
+    ? ((xp - rank.min) / (nextRank.min - rank.min)) * 100
+    : 100;
+
+  return { xp, rank, nextRank, rankProgress, answeredDrills, correctDrills };
+}
 
 function useCourseProgress() {
   const [progress, setProgress] = useState<Progress>(emptyProgress);
@@ -104,6 +147,7 @@ export default function AcademyApp() {
   const [labTab, setLabTab] = useState<LabTab>("calculators");
 
   const completion = (progress.completed.length / modules.length) * 100;
+  const operatorStats = useMemo(() => getOperatorStats(progress), [progress]);
   const activeModule = modules.find((item) => item.id === activeModuleId) ?? modules[0];
 
   const navigate = (next: View) => {
@@ -117,6 +161,11 @@ export default function AcademyApp() {
     setView("module");
     setMobileOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const openLab = (tab: LabTab) => {
+    setLabTab(tab);
+    navigate("lab");
   };
 
   const saveScore = (moduleId: string, score: number) => {
@@ -133,7 +182,8 @@ export default function AcademyApp() {
 
   return (
     <div className="academy-shell">
-      <aside className={`sidebar ${mobileOpen ? "is-open" : ""}`}>
+      <a className="skip-link" href="#academy-content">Skip to academy content</a>
+      <aside id="academy-navigation" className={`sidebar ${mobileOpen ? "is-open" : ""}`}>
         <div className="brand-block">
           <button className="brand" onClick={() => navigate("dashboard")} aria-label="Sol Academy home">
             <span className="brand-orbit"><i /></span>
@@ -149,7 +199,7 @@ export default function AcademyApp() {
               key={item.view}
               className={view === item.view || (view === "module" && item.view === "path") ? "active" : ""}
               onClick={() => navigate(item.view)}
-              aria-current={view === item.view ? "page" : undefined}
+              aria-current={view === item.view || (view === "module" && item.view === "path") ? "page" : undefined}
             >
               <span>{item.mark}</span>{item.label}
             </button>
@@ -157,10 +207,10 @@ export default function AcademyApp() {
         </nav>
 
         <div className="sidebar-progress">
-          <div className="progress-ring" style={{ "--progress": `${completion * 3.6}deg` } as React.CSSProperties}>
+          <div className="progress-ring" role="progressbar" aria-label="Course completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completion)} style={{ "--progress": `${completion * 3.6}deg` } as React.CSSProperties}>
             <span>{Math.round(completion)}%</span>
           </div>
-          <div><strong>{progress.completed.length}/{modules.length} modules</strong><small>Saved on this device</small></div>
+          <div><strong>{operatorStats.rank.name}</strong><small>{operatorStats.xp} XP · {progress.completed.length}/{modules.length} modules</small></div>
         </div>
 
         <div className="sidebar-note">
@@ -172,11 +222,12 @@ export default function AcademyApp() {
 
       {mobileOpen && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
 
-      <main className="main-stage">
+      <main id="academy-content" className="main-stage">
         <header className="topbar">
-          <button className="mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation">MENU</button>
+          <button className="mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation" aria-controls="academy-navigation" aria-expanded={mobileOpen}>MENU</button>
           <div className="topbar-status"><i /> <span>LOCAL MODE</span><b>Progress stays in your browser</b></div>
-          <div className="topbar-disclaimer">EDUCATION / PAPER MODE FIRST / NO GUARANTEED RETURNS</div>
+          <div className="topbar-tape" aria-label="Simulated market telemetry"><span>SIM</span><b>MC 42.8K</b><i>LIQ 11.4K</i><em>FLOW +17%</em></div>
+          <div className="topbar-rank"><span>{operatorStats.rank.code}</span><strong>{operatorStats.rank.name}</strong><b>{operatorStats.xp} XP</b></div>
         </header>
 
         {!hydrated ? (
@@ -190,6 +241,8 @@ export default function AcademyApp() {
                 nextModule={nextIncomplete}
                 openModule={openModule}
                 navigate={navigate}
+                openLab={openLab}
+                stats={operatorStats}
                 setProgress={setProgress}
               />
             )}
@@ -228,6 +281,8 @@ function Dashboard({
   nextModule,
   openModule,
   navigate,
+  openLab,
+  stats,
   setProgress,
 }: {
   progress: Progress;
@@ -235,8 +290,23 @@ function Dashboard({
   nextModule: Module;
   openModule: (id: string) => void;
   navigate: (view: View) => void;
+  openLab: (tab: LabTab) => void;
+  stats: OperatorStats;
   setProgress: React.Dispatch<React.SetStateAction<Progress>>;
 }) {
+  const nextDrill = drills.find((drill) => progress.drillAnswers[drill.id] === undefined);
+  const hasPassed = (numbers: number[]) => numbers.every((number) => {
+    const courseModule = modules.find((item) => item.number === number);
+    return courseModule ? progress.completed.includes(courseModule.id) : false;
+  });
+  const badges = [
+    { mark: "SL", label: "Screen literate", unlocked: (progress.diagnosticScore ?? 0) >= 80 },
+    { mark: "MM", label: "Market mechanic", unlocked: hasPassed([1, 2, 3, 4]) },
+    { mark: "WC", label: "Wallet cartographer", unlocked: hasPassed([5, 6]) },
+    { mark: "RF", label: "Risk first", unlocked: hasPassed([9]) },
+    { mark: "TA", label: "Tape analyst", unlocked: progress.vodEntries.length >= 3 },
+  ];
+
   return (
     <div className="page dashboard-page">
       <section className="hero-grid">
@@ -255,9 +325,10 @@ function Dashboard({
           </div>
         </div>
 
-        <div className="signal-console" aria-label="Academy signal stack diagram">
+        <div className="signal-console" role="img" aria-label="Simulated trading-terminal chart showing the five-stage decision stack">
           <div className="console-head"><span>DECISION STACK</span><b>NO AUTOBUY</b></div>
-          <div className="signal-chart">
+          <div className="console-livebar" aria-hidden="true"><span><i /> PAPER FEED</span><b>AGE 06:14</b><b>MAKERS 184</b><b className="positive">BUY/SELL 1.34</b></div>
+          <div className="signal-chart" aria-hidden="true">
             <div className="chart-grid-lines" />
             <div className="candle c1 down" /><div className="candle c2 up" /><div className="candle c3 up" />
             <div className="candle c4 down" /><div className="candle c5 up" /><div className="candle c6 up" />
@@ -272,6 +343,36 @@ function Dashboard({
             <li><span>04</span><div><strong>RISK + CAPACITY</strong><small>Loss path, size, executable exit</small></div><b>REQUIRED</b></li>
             <li><span>05</span><div><strong>EXECUTION STATE</strong><small>Bound, fee, tip, confirmation</small></div><b>LAST</b></li>
           </ol>
+        </div>
+      </section>
+
+      <section className="operator-hud" aria-label="Operator progression and missions">
+        <div className="rank-console">
+          <div className="rank-code">{stats.rank.code}</div>
+          <div className="rank-copy">
+            <span>OPERATOR RANK</span>
+            <h2>{stats.rank.name}</h2>
+            <p>{stats.nextRank ? `${stats.nextRank.min - stats.xp} XP TO ${stats.nextRank.name.toUpperCase()}` : "MAXIMUM ACADEMY RANK"}</p>
+          </div>
+          <strong>{stats.xp}<small> XP</small></strong>
+          <div className="rank-track" role="progressbar" aria-label="Progress to next operator rank" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(stats.rankProgress)}><i style={{ width: `${stats.rankProgress}%` }} /></div>
+        </div>
+
+        <div className="mission-deck">
+          <button onClick={() => openModule(nextModule.id)}>
+            <span>PRIMARY MISSION</span><strong>{progress.completed.length === modules.length ? "Replay any module" : `Clear M${String(nextModule.number).padStart(2, "0")}`}</strong><small>+100 XP · {nextModule.shortTitle}</small><b>OPEN →</b>
+          </button>
+          <button onClick={() => navigate("drills")} className={!nextDrill ? "cleared" : ""}>
+            <span>FIELD READ</span><strong>{nextDrill ? nextDrill.label : "Drill deck cleared"}</strong><small>{stats.correctDrills}/{drills.length} clean reads</small><b>{nextDrill ? "RUN →" : "REPLAY →"}</b>
+          </button>
+          <button onClick={() => openLab("vod")} className={progress.vodEntries.length >= 3 ? "cleared" : ""}>
+            <span>TAPE WORK</span><strong>Log a VOD decision</strong><small>{progress.vodEntries.length} evidence-grade reads saved</small><b>LOG →</b>
+          </button>
+        </div>
+
+        <div className="badge-rack">
+          <div><span>ACHIEVEMENTS</span><strong>{badges.filter((badge) => badge.unlocked).length}/{badges.length} UNLOCKED</strong></div>
+          <ul>{badges.map((badge) => <li className={badge.unlocked ? "unlocked" : ""} key={badge.label} title={badge.label}><b>{badge.unlocked ? "✓" : badge.mark}</b><span>{badge.label}</span></li>)}</ul>
         </div>
       </section>
 
@@ -346,7 +447,7 @@ function Diagnostic({ progress, setProgress }: { progress: Progress; setProgress
             <button className="primary-action full" disabled={Object.keys(answers).length !== diagnosticQuestions.length} onClick={submit}>Score my baseline <span>→</span></button>
           ) : (
             <div className={`score-result ${score >= 80 ? "pass" : "review"}`}>
-              <span>{score}%</span><div><strong>{score >= 80 ? "Screen-literate foundation" : "Good—now we know the gaps"}</strong><p>{score >= 80 ? "The course will turn that vocabulary into repeatable decisions." : "Start at Module 1. The score is a map, not a judgment."}</p></div>
+              <span>{score}%</span><div><b className="xp-award">BASELINE LOGGED · +50 XP</b><strong>{score >= 80 ? "Screen-literate foundation" : "Good—now we know the gaps"}</strong><p>{score >= 80 ? "The course will turn that vocabulary into repeatable decisions." : "Start at Module 1. The score is a map, not a judgment."}</p></div>
             </div>
           )}
         </div>
@@ -463,7 +564,7 @@ function Quiz({ questions, previousScore, onScore }: { questions: Question[]; pr
       {previousScore !== undefined && <p className="previous-score">Current best: {previousScore}%</p>}
       {questions.map((item, index) => <QuestionBlock key={item.id} question={item} index={index} selected={answers[item.id]} submitted={submitted} onSelect={(answer) => !submitted && setAnswers((current) => ({ ...current, [item.id]: answer }))} />)}
       {!submitted ? <button className="primary-action full" disabled={Object.keys(answers).length !== questions.length} onClick={submit}>Submit module check <span>→</span></button> : (
-        <div className={`score-result ${score >= 80 ? "pass" : "review"}`}><span>{score}%</span><div><strong>{score >= 80 ? "Module passed" : "Review the explanations"}</strong><p>{score >= 80 ? "The module is now counted in VOD readiness." : "A wrong answer is useful when its explanation changes your model."}</p><button onClick={retry}>Try again</button></div></div>
+        <div className={`score-result ${score >= 80 ? "pass" : "review"}`} role="status"><span>{score}%</span><div>{score >= 80 && <b className="xp-award">MODULE CLEAR · {(previousScore ?? 0) < 80 ? "+100 XP" : "BEST SCORE SAVED"}</b>}<strong>{score >= 80 ? "Module passed" : "Model update required"}</strong><p>{score >= 80 ? "The module is now counted in VOD readiness." : "A wrong answer is useful when its explanation changes your model."}</p><button onClick={retry}>Try again</button></div></div>
       )}
     </section>
   );
@@ -473,9 +574,9 @@ function QuestionBlock({ question, index, selected, submitted, onSelect }: { que
   return (
     <div className={`question-block ${submitted ? (selected === question.answer ? "correct" : "incorrect") : ""}`}>
       <div className="question-prompt"><span>{String(index + 1).padStart(2, "0")}</span><strong>{question.prompt}</strong></div>
-      <div className="answer-grid">
+      <div className="answer-grid" role="radiogroup" aria-label={`Answer choices for question ${index + 1}`}>
         {question.options.map((option, optionIndex) => (
-          <button key={option} className={`${selected === optionIndex ? "selected" : ""} ${submitted && optionIndex === question.answer ? "right-answer" : ""}`} onClick={() => onSelect(optionIndex)} aria-pressed={selected === optionIndex}>
+          <button key={option} role="radio" aria-checked={selected === optionIndex} className={`${selected === optionIndex ? "selected" : ""} ${submitted && optionIndex === question.answer ? "right-answer" : ""}`} onClick={() => onSelect(optionIndex)}>
             <span>{String.fromCharCode(65 + optionIndex)}</span>{option}
           </button>
         ))}
@@ -490,10 +591,16 @@ function Drills({ progress, setProgress }: { progress: Progress; setProgress: Re
   const drill = drills.find((item) => item.id === active) ?? drills[0];
   const selected = progress.drillAnswers[drill.id];
   const answered = selected !== undefined;
+  const answeredCount = drills.filter((item) => progress.drillAnswers[item.id] !== undefined).length;
+  const correctCount = drills.filter((item) => progress.drillAnswers[item.id] === item.answer).length;
+  const accuracy = answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : undefined;
+  const activeIndex = drills.findIndex((item) => item.id === active);
+  const nextDrill = drills[(activeIndex + 1) % drills.length];
   const answer = (choice: number) => setProgress((current) => ({ ...current, drillAnswers: { ...current.drillAnswers, [drill.id]: choice } }));
   return (
     <div className="page drills-page">
       <PageLead eyebrow="DECISION DRILLS" title="Turn labels into the next question." body="These are not buy calls. They train the exact move experts make between a screen metric and a defensible decision." />
+      <div className="simulation-hud" aria-label="Decision drill performance"><span><i /> SIMULATION ONLINE</span><b>{answeredCount}/{drills.length} CASES LOGGED</b><b>{correctCount} CLEAN READS</b><strong>{accuracy === undefined ? "—" : `${accuracy}%`}<small> ACCURACY</small></strong></div>
       <div className="drill-tabs" role="tablist" aria-label="Decision drills">{drills.map((item, index) => <button role="tab" aria-selected={item.id === active} className={item.id === active ? "active" : ""} onClick={() => setActive(item.id)} key={item.id}><span>{String(index + 1).padStart(2, "0")}</span>{item.label}{progress.drillAnswers[item.id] !== undefined && <b>✓</b>}</button>)}</div>
       <section className="drill-stage">
         <div className="drill-context">
@@ -503,7 +610,7 @@ function Drills({ progress, setProgress }: { progress: Progress; setProgress: Re
         <div className="drill-decision">
           <span className="section-kicker">YOUR DECISION</span><h3>{drill.prompt}</h3>
           <div className="drill-choices">{drill.choices.map((choice, index) => <button disabled={answered} className={`${selected === index ? "selected" : ""} ${answered && index === drill.answer ? "correct" : ""}`} onClick={() => answer(index)} key={choice}><span>{String.fromCharCode(65 + index)}</span>{choice}</button>)}</div>
-          {answered && <div className={`drill-debrief ${selected === drill.answer ? "pass" : "review"}`}><strong>{selected === drill.answer ? "Clean read." : "Slow the inference down."}</strong>{drill.debrief.map((item) => <p key={item}>{item}</p>)}<button onClick={() => setProgress((current) => { const next = { ...current.drillAnswers }; delete next[drill.id]; return { ...current, drillAnswers: next }; })}>Reset this drill</button></div>}
+          {answered && <div className={`drill-debrief ${selected === drill.answer ? "pass" : "review"}`} role="status"><b className="xp-award">READ LOGGED · +{selected === drill.answer ? 50 : 10} XP</b><strong>{selected === drill.answer ? "Clean read." : "Slow the inference down."}</strong>{drill.debrief.map((item) => <p key={item}>{item}</p>)}<div className="debrief-actions"><button onClick={() => setActive(nextDrill.id)}>Next simulation →</button><button onClick={() => setProgress((current) => { const next = { ...current.drillAnswers }; delete next[drill.id]; return { ...current, drillAnswers: next }; })}>Reset this drill</button></div></div>}
         </div>
       </section>
     </div>
