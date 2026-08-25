@@ -541,10 +541,10 @@ export const modules: Module[] = [
         sources: ["coingecko-state", "coingecko-q1"],
       },
       {
-        eyebrow: "Weekend contract",
+        eyebrow: "Core-path contract",
         title: "Literacy first, your own edge second",
         body: [
-          "After the Weekend Core you should be able to pause a VOD and describe the visible opportunity, missing information, thesis, invalidation, size logic, transaction risk, and exit logic. You do not need to predict every candle or copy the trader's exact method.",
+          "After the two-day Core Path you should be able to pause a VOD and describe the visible opportunity, missing information, thesis, invalidation, size logic, transaction risk, and exit logic. You do not need to predict every candle or copy the trader's exact method.",
           "The method design space is enormous because an edge can live in the universe you scan, information you collect, state you wait for, evidence you require, trigger you act on, size you deploy, or exit you use. Profitable edges are not automatic: every combination must survive evidence, costs, and changing market regimes. Your first goal is legibility; your second is a journaled manual edge; automation is a later multiplier.",
         ],
         bullets: [

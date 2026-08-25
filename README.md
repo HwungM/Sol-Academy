@@ -4,12 +4,12 @@ An interactive, evidence-backed course for learning how Solana memecoin markets 
 
 The academy now has two clear layers:
 
-- **Weekend Core:** Modules 01–08 contain 7h35 of lesson material, or roughly 9–10 focused hours with checks and breaks. This is the minimum path to understanding a fast memecoin VOD.
+- **2-Day Core Path:** Modules 01–08 contain 7h35 of lesson material, or roughly 9–10 focused hours with checks and breaks. Complete Day 1 and Day 2 whenever they fit your schedule; this is the minimum path to understanding a fast memecoin VOD.
 - **Bonus Arsenal:** Modules 09–12 add setup families, execution internals, automation architecture, historical replay, and a full VOD capstone.
 
 The product includes:
 
-- 12 sequenced modules split into the Weekend Core and optional Bonus Arsenal
+- 12 sequenced modules split into the 2-Day Core Path and optional Bonus Arsenal
 - 48 graded questions plus an entry diagnostic
 - decision drills built around incomplete, adversarial market data
 - learning-based XP, six operator ranks, missions, and mastery achievements

@@ -91,12 +91,82 @@ const operatorRanks: OperatorRank[] = [
 const weekendCoreModules = modules.filter((module) => module.track === "Weekend Core");
 const bonusArsenalModules = modules.filter((module) => module.track === "Bonus Arsenal");
 const weekendLessonMinutes = 455;
+const courseModuleIds = new Set(modules.map((module) => module.id));
 
-const pct = (value: number) => `${Math.round(value)}%`;
+const pct = (value: number) => {
+  if (!Number.isFinite(value)) return "—";
+  if (value > 9_999) return ">9,999%";
+  if (value < -9_999) return "<-9,999%";
+  return `${Math.round(value)}%`;
+};
 const formatNumber = (value: number, digits = 2) =>
   Number.isFinite(value)
     ? new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value)
     : "—";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+function hydrateProgress(value: unknown): Progress {
+  if (!isRecord(value)) return { ...emptyProgress };
+
+  const scores: Record<string, number> = {};
+  if (isRecord(value.scores)) {
+    Object.entries(value.scores).forEach(([moduleId, score]) => {
+      if (courseModuleIds.has(moduleId) && typeof score === "number" && Number.isFinite(score)) scores[moduleId] = Math.max(0, Math.min(100, score));
+    });
+  }
+
+  const notes: Record<string, string> = {};
+  if (isRecord(value.notes)) {
+    Object.entries(value.notes).forEach(([moduleId, note]) => {
+      if (courseModuleIds.has(moduleId) && typeof note === "string") notes[moduleId] = note;
+    });
+  }
+
+  const drillAnswers: Record<string, number> = {};
+  if (isRecord(value.drillAnswers)) {
+    Object.entries(value.drillAnswers).forEach(([drillId, answer]) => {
+      const drill = drills.find((item) => item.id === drillId);
+      if (drill && typeof answer === "number" && Number.isInteger(answer) && answer >= 0 && answer < drill.choices.length) drillAnswers[drillId] = answer;
+    });
+  }
+
+  const vodEntries: VodEntry[] = Array.isArray(value.vodEntries)
+    ? value.vodEntries.flatMap((item) => {
+        if (!isRecord(item)) return [];
+        const fields = ["id", "url", "timestamp", "action", "observation", "thesis", "invalidation", "evidenceGrade"] as const;
+        if (!fields.every((field) => typeof item[field] === "string")) return [];
+        return [{
+          id: item.id as string,
+          url: item.url as string,
+          timestamp: item.timestamp as string,
+          action: item.action as string,
+          observation: item.observation as string,
+          thesis: item.thesis as string,
+          invalidation: item.invalidation as string,
+          evidenceGrade: item.evidenceGrade as string,
+        }];
+      })
+    : [];
+
+  const completed = Array.isArray(value.completed)
+    ? value.completed.filter((moduleId): moduleId is string => typeof moduleId === "string" && courseModuleIds.has(moduleId))
+    : [];
+  const passedFromScores = Object.entries(scores).filter(([, score]) => score >= passScore).map(([moduleId]) => moduleId);
+  const diagnosticScore = typeof value.diagnosticScore === "number" && Number.isFinite(value.diagnosticScore)
+    ? Math.max(0, Math.min(100, value.diagnosticScore))
+    : undefined;
+
+  return {
+    completed: Array.from(new Set([...completed, ...passedFromScores])),
+    scores,
+    notes,
+    drillAnswers,
+    vodEntries,
+    ...(diagnosticScore !== undefined ? { diagnosticScore } : {}),
+  };
+}
 
 function getOperatorStats(progress: Progress): OperatorStats {
   const answeredDrills = drills.filter((drill) => progress.drillAnswers[drill.id] !== undefined).length;
@@ -141,18 +211,7 @@ function useCourseProgress() {
       try {
         const saved = window.localStorage.getItem("sol-academy-progress-v1");
         if (saved) {
-          const parsed = JSON.parse(saved) as Partial<Progress>;
-          const savedScores = parsed.scores ?? {};
-          const passedFromScores = Object.entries(savedScores).filter(([, score]) => score >= passScore).map(([moduleId]) => moduleId);
-          setProgress({
-            ...emptyProgress,
-            ...parsed,
-            completed: Array.from(new Set([...(parsed.completed ?? []), ...passedFromScores])),
-            scores: savedScores,
-            notes: parsed.notes ?? {},
-            drillAnswers: parsed.drillAnswers ?? {},
-            vodEntries: parsed.vodEntries ?? [],
-          });
+          setProgress(hydrateProgress(JSON.parse(saved)));
         }
       } catch {
         setProgress(emptyProgress);
@@ -166,7 +225,11 @@ function useCourseProgress() {
 
   useEffect(() => {
     if (!hydrated) return;
-    window.localStorage.setItem("sol-academy-progress-v1", JSON.stringify(progress));
+    try {
+      window.localStorage.setItem("sol-academy-progress-v1", JSON.stringify(progress));
+    } catch {
+      // The academy still works in memory when browser storage is unavailable or full.
+    }
   }, [hydrated, progress]);
 
   return { progress, setProgress, hydrated };
@@ -212,7 +275,7 @@ export default function AcademyApp() {
     });
   };
 
-  const nextIncomplete = curriculumStats.nextCore ?? curriculumStats.nextBonus ?? modules.at(-1)!;
+  const nextIncomplete = curriculumStats.nextCore ?? curriculumStats.nextBonus ?? modules[0];
 
   return (
     <div className="academy-shell">
@@ -241,7 +304,7 @@ export default function AcademyApp() {
         </nav>
 
         <div className="sidebar-progress">
-          <div className="progress-ring" role="progressbar" aria-label="Weekend Core completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completion)} style={{ "--progress": `${completion * 3.6}deg` } as React.CSSProperties}>
+          <div className="progress-ring" role="progressbar" aria-label="Core path completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completion)} style={{ "--progress": `${completion * 3.6}deg` } as React.CSSProperties}>
             <span>{Math.round(completion)}%</span>
           </div>
           <div><strong>{curriculumStats.coreReady ? "VOD LITERATE" : operatorStats.rank.name}</strong><small>{curriculumStats.corePassed}/{curriculumStats.coreTotal} core · {curriculumStats.bonusPassed}/{curriculumStats.bonusTotal} bonus</small></div>
@@ -332,6 +395,7 @@ function Dashboard({
   setProgress: React.Dispatch<React.SetStateAction<Progress>>;
 }) {
   const nextDrill = drills.find((drill) => progress.drillAnswers[drill.id] === undefined);
+  const allComplete = modules.every((module) => progress.completed.includes(module.id));
   const hasPassed = (numbers: number[]) => numbers.every((number) => {
     const courseModule = modules.find((item) => item.number === number);
     return courseModule ? progress.completed.includes(courseModule.id) : false;
@@ -348,11 +412,11 @@ function Dashboard({
     <div className="page dashboard-page">
       <section className="hero-grid">
         <div className="hero-copy">
-          <p className="eyebrow"><span>◆</span> WEEKEND CORE // VOD LITERACY</p>
-          <h1>Understand the screen.<br /><em>By Sunday night.</em><br />Build your edge next.</h1>
+          <p className="eyebrow"><span>◆</span> 2-DAY CORE // VOD LITERACY</p>
+          <h1>Understand the screen.<br /><em>In two focused days.</em><br />Build your edge next.</h1>
           <p className="hero-lead">Eight focused modules teach the minimum mechanics, wallet evidence, crowd behavior, and risk logic needed to follow fast memecoin VODs. Everything afterward is your bonus arsenal.</p>
           <div className="hero-actions">
-            <button className="primary-action" onClick={() => openModule(nextModule.id)}>{curriculum.coreReady ? "Enter Bonus" : "Continue Weekend Core"}: {nextModule.shortTitle}<span>→</span></button>
+            <button className="primary-action" onClick={() => openModule(nextModule.id)}>{allComplete ? "Replay Core" : curriculum.coreReady ? "Enter Bonus" : "Continue Core Path"}: {nextModule.shortTitle}<span>→</span></button>
             <button className="ghost-action" onClick={() => navigate("drills")}>Test my screen literacy</button>
           </div>
           <div className="hero-proof">
@@ -397,7 +461,7 @@ function Dashboard({
 
         <div className="mission-deck">
           <button onClick={() => openModule(nextModule.id)}>
-            <span>{curriculum.coreReady ? "BONUS MISSION" : "WEEKEND MISSION"}</span><strong>{progress.completed.length === modules.length ? "Replay any module" : `Clear M${String(nextModule.number).padStart(2, "0")}`}</strong><small>+100 XP · {nextModule.shortTitle}</small><b>OPEN →</b>
+            <span>{allComplete ? "REPLAY MISSION" : curriculum.coreReady ? "BONUS MISSION" : "CORE MISSION"}</span><strong>{allComplete ? "Replay the foundation" : `Clear M${String(nextModule.number).padStart(2, "0")}`}</strong><small>{allComplete ? "Review · no additional XP" : `+100 XP · ${nextModule.shortTitle}`}</small><b>OPEN →</b>
           </button>
           <button onClick={() => navigate("drills")} className={!nextDrill ? "cleared" : ""}>
             <span>FIELD READ</span><strong>{nextDrill ? nextDrill.label : "Drill deck cleared"}</strong><small>{stats.correctDrills}/{drills.length} clean reads</small><b>{nextDrill ? "RUN →" : "REPLAY →"}</b>
@@ -415,7 +479,7 @@ function Dashboard({
 
       <section className="dashboard-strip">
         <div className="completion-card">
-          <div className="section-label">WEEKEND CORE</div>
+          <div className="section-label">2-DAY CORE</div>
           <div className="completion-head"><strong>{Math.round(completion)}%</strong><span>VOD readiness</span></div>
           <div className="wide-progress"><i style={{ width: `${completion}%` }} /></div>
           <p>{curriculum.coreReady ? "VOD LITERATE. You can now follow the screen; the Bonus Arsenal deepens your method." : curriculum.corePassed === 0 ? "Start with the game map. Budget roughly five focused hours per day." : `${curriculum.corePassed}/${curriculum.coreTotal} core modules passed at ${passScore}% or better.`}</p>
@@ -426,7 +490,7 @@ function Dashboard({
           <p>The design space is enormous because you can combine a universe, state, evidence rule, trigger, size, and exit. Profitable edges are scarce, though: a bot multiplies a measured method; it does not supply one.</p>
         </div>
         <div className="continue-card">
-          <div className="section-label">{curriculum.coreReady ? "BONUS GATE" : "NEXT CORE GATE"}</div>
+          <div className="section-label">{allComplete ? "REPLAY GATE" : curriculum.coreReady ? "BONUS GATE" : "NEXT CORE GATE"}</div>
           <span className="module-number">{String(nextModule.number).padStart(2, "0")}</span>
           <div><strong>{nextModule.shortTitle}</strong><small>{nextModule.duration} · {nextModule.difficulty}</small></div>
           <button onClick={() => openModule(nextModule.id)} aria-label={`Open ${nextModule.title}`}>→</button>
@@ -435,13 +499,13 @@ function Dashboard({
 
       <section className="phase-preview">
         <div className="section-heading">
-          <div><p className="eyebrow">THE WEEKEND ROUTE</p><h2>Understand first. Specialize afterward.</h2></div>
+          <div><p className="eyebrow">THE 2-DAY ROUTE</p><h2>Understand first. Specialize afterward.</h2></div>
           <button onClick={() => navigate("path")}>View full curriculum →</button>
         </div>
         <div className="phase-cards">
           {[
-            { phase: "Saturday", range: "01—04 · 3H20", text: "Decode the game, money, lifecycle, and terminal screen.", color: "violet", moduleNumbers: [1, 2, 3, 4] },
-            { phase: "Sunday", range: "05—08 · 4H15", text: "Decode wallets, narratives, tape, risk, and decisions.", color: "green", moduleNumbers: [5, 6, 7, 8] },
+            { phase: "Day 1", range: "01—04 · 3H20", text: "Decode the game, money, lifecycle, and terminal screen.", color: "violet", moduleNumbers: [1, 2, 3, 4] },
+            { phase: "Day 2", range: "05—08 · 4H15", text: "Decode wallets, narratives, tape, risk, and decisions.", color: "green", moduleNumbers: [5, 6, 7, 8] },
             { phase: "Bonus Arsenal", range: "09—12 · OPTIONAL", text: "Study setup families, execution, automation, and full VOD replay.", color: "amber", moduleNumbers: [9, 10, 11, 12] },
           ].map((item) => (
             <article className={`phase-card ${item.color}`} key={item.phase}>
@@ -461,11 +525,13 @@ function Diagnostic({ progress, setProgress }: { progress: Progress; setProgress
   const [open, setOpen] = useState(false);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [earnedBaseline, setEarnedBaseline] = useState(false);
   const score = Math.round((diagnosticQuestions.filter((item) => answers[item.id] === item.answer).length / diagnosticQuestions.length) * 100);
 
   const submit = () => {
+    setEarnedBaseline(progress.diagnosticScore === undefined);
     setSubmitted(true);
-    setProgress((current) => ({ ...current, diagnosticScore: score }));
+    setProgress((current) => ({ ...current, diagnosticScore: Math.max(current.diagnosticScore ?? 0, score) }));
   };
 
   return (
@@ -483,8 +549,8 @@ function Diagnostic({ progress, setProgress }: { progress: Progress; setProgress
           {!submitted ? (
             <button className="primary-action full" disabled={Object.keys(answers).length !== diagnosticQuestions.length} onClick={submit}>Score my baseline <span>→</span></button>
           ) : (
-            <div className={`score-result ${score >= 80 ? "pass" : "review"}`}>
-              <span>{score}%</span><div><b className="xp-award">BASELINE LOGGED · +50 XP</b><strong>{score >= 80 ? "Screen-literate foundation" : "Good—now we know the gaps"}</strong><p>{score >= 80 ? "The course will turn that vocabulary into repeatable decisions." : "Start at Module 1. The score is a map, not a judgment."}</p></div>
+            <div className={`score-result ${score >= 80 ? "pass" : "review"}`} role="status">
+              <span>{score}%</span><div><b className="xp-award">BASELINE LOGGED · {earnedBaseline ? "+50 XP" : "BEST SCORE SAVED"}</b><strong>{score >= 80 ? "Screen-literate foundation" : "Good—now we know the gaps"}</strong><p>{score >= 80 ? "The course will turn that vocabulary into repeatable decisions." : "Start at Module 1. The score is a map, not a judgment."}</p></div>
             </div>
           )}
         </div>
@@ -514,19 +580,19 @@ function Curriculum({ progress, openModule }: { progress: Progress; openModule: 
 
   return (
     <div className="page curriculum-page">
-      <PageLead eyebrow="WEEKEND CORE + BONUS ARSENAL" title="Understand the trenches this weekend." body={`Finish Modules 01–08 in ${Math.floor(weekendLessonMinutes / 60)}h ${weekendLessonMinutes % 60}m of lesson time—roughly 9–10 focused hours with checks and breaks. Modules 09–12 deepen the craft; they are not prerequisites for understanding a VOD.`} />
+      <PageLead eyebrow="2-DAY CORE + BONUS ARSENAL" title="Understand the trenches in two focused days." body={`Finish Modules 01–08 in ${Math.floor(weekendLessonMinutes / 60)}h ${weekendLessonMinutes % 60}m of lesson time—roughly 9–10 focused hours with checks and breaks. Modules 09–12 deepen the craft; they are not prerequisites for understanding a VOD.`} />
 
       <section className="weekend-status-panel">
-        <div><span>WEEKEND STATUS</span><strong>{curriculum.coreReady ? "VOD LITERATE" : `${curriculum.corePassed}/${curriculum.coreTotal} CORE CLEARED`}</strong><p>{curriculum.coreReady ? "You have cleared the comprehension path. Move into the Bonus Arsenal to discover, test, and automate a method." : "Pass each core knowledge check at 75% or better. The goal is screen legibility—not instant profitability."}</p></div>
-        <div className="weekend-meter" role="progressbar" aria-label="Weekend Core completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(curriculum.corePct)}><span>{Math.round(curriculum.corePct)}%</span><i><b style={{ width: `${curriculum.corePct}%` }} /></i></div>
+        <div><span>CORE STATUS</span><strong>{curriculum.coreReady ? "VOD LITERATE" : `${curriculum.corePassed}/${curriculum.coreTotal} CORE CLEARED`}</strong><p>{curriculum.coreReady ? "You have cleared the comprehension path. Move into the Bonus Arsenal to discover, test, and automate a method." : "Pass each core knowledge check at 75% or better. The goal is screen legibility—not instant profitability."}</p></div>
+        <div className="weekend-meter" role="progressbar" aria-label="Core path completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(curriculum.corePct)}><span>{Math.round(curriculum.corePct)}%</span><i><b style={{ width: `${curriculum.corePct}%` }} /></i></div>
       </section>
 
       <section className="curriculum-phase">
-        <div className="phase-divider"><span>Saturday · Decode the market and screen · 3h20 lessons</span><i /></div>
+        <div className="phase-divider"><span>Day 1 · Decode the market and screen · 3h20 lessons</span><i /></div>
         {renderModuleCards(weekendCoreModules.filter((module) => module.weekendDay === 1))}
       </section>
       <section className="curriculum-phase">
-        <div className="phase-divider"><span>Sunday · Decode participants and decisions · 4h15 lessons</span><i /></div>
+        <div className="phase-divider"><span>Day 2 · Decode participants and decisions · 4h15 lessons</span><i /></div>
         {renderModuleCards(weekendCoreModules.filter((module) => module.weekendDay === 2))}
       </section>
 
@@ -567,7 +633,7 @@ function ModuleView({
       <button className="back-link" onClick={back}>← Curriculum</button>
       <header className="module-hero">
         <div className="module-index">MODULE {String(module.number).padStart(2, "0")} / {String(modules.length).padStart(2, "0")}</div>
-        <p className="eyebrow">{module.track.toUpperCase()}{module.weekendDay ? ` · DAY ${module.weekendDay}` : ""} · {module.duration.toUpperCase()}</p>
+        <p className="eyebrow">{module.track === "Weekend Core" ? "CORE PATH" : module.track.toUpperCase()}{module.weekendDay ? ` · DAY ${module.weekendDay}` : ""} · {module.duration.toUpperCase()}</p>
         <h1>{module.title}</h1>
         <p>{module.kicker}</p>
         <div className="outcome-box"><span>OUTCOME</span><p>{module.outcome}</p><b>{passed ? "PASSED" : (progress.scores[module.id] !== undefined ? `BEST ${progress.scores[module.id]}%` : "NOT SCORED")}</b></div>
@@ -594,7 +660,7 @@ function ModuleView({
             <ol>{module.takeaways.map((item, itemIndex) => <li key={item}><span>{String(itemIndex + 1).padStart(2, "0")}</span>{item}</li>)}</ol>
           </section>
 
-          <Quiz questions={module.quiz} previousScore={progress.scores[module.id]} onScore={(score) => saveScore(module.id, score)} />
+          <Quiz key={module.id} questions={module.quiz} previousScore={progress.scores[module.id]} onScore={(score) => saveScore(module.id, score)} />
 
           <section className="notes-panel">
             <div><p className="section-kicker">PRIVATE NOTES</p><h2>Explain it in your own words.</h2></div>
@@ -616,16 +682,21 @@ function ModuleView({
 function Quiz({ questions, previousScore, onScore }: { questions: Question[]; previousScore?: number; onScore: (score: number) => void }) {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [earnedPass, setEarnedPass] = useState(false);
   const score = Math.round((questions.filter((item) => answers[item.id] === item.answer).length / questions.length) * 100);
-  const submit = () => { setSubmitted(true); onScore(score); };
-  const retry = () => { setAnswers({}); setSubmitted(false); };
+  const submit = () => {
+    setEarnedPass(score >= passScore && (previousScore ?? 0) < passScore);
+    setSubmitted(true);
+    onScore(score);
+  };
+  const retry = () => { setAnswers({}); setSubmitted(false); setEarnedPass(false); };
   return (
     <section className="quiz-panel module-quiz">
       <div className="quiz-head"><div><p className="section-kicker">KNOWLEDGE CHECK</p><h2>Prove the distinction.</h2></div><span>PASS ≥ {passScore}%</span></div>
       {previousScore !== undefined && <p className="previous-score">Current best: {previousScore}%</p>}
       {questions.map((item, index) => <QuestionBlock key={item.id} question={item} index={index} selected={answers[item.id]} submitted={submitted} onSelect={(answer) => !submitted && setAnswers((current) => ({ ...current, [item.id]: answer }))} />)}
       {!submitted ? <button className="primary-action full" disabled={Object.keys(answers).length !== questions.length} onClick={submit}>Submit module check <span>→</span></button> : (
-        <div className={`score-result ${score >= passScore ? "pass" : "review"}`} role="status"><span>{score}%</span><div>{score >= passScore && <b className="xp-award">MODULE CLEAR · {(previousScore ?? 0) < passScore ? "+100 XP" : "BEST SCORE SAVED"}</b>}<strong>{score >= passScore ? "Module passed" : "Model update required"}</strong><p>{score >= passScore ? "The module is now counted in VOD readiness." : "A wrong answer is useful when its explanation changes your model."}</p><button onClick={retry}>Try again</button></div></div>
+        <div className={`score-result ${score >= passScore ? "pass" : "review"}`} role="status"><span>{score}%</span><div>{score >= passScore && <b className="xp-award">MODULE CLEAR · {earnedPass ? "+100 XP" : "BEST SCORE SAVED"}</b>}<strong>{score >= passScore ? "Module passed" : "Model update required"}</strong><p>{score >= passScore ? "The module is now counted in VOD readiness." : "A wrong answer is useful when its explanation changes your model."}</p><button onClick={retry}>Try again</button></div></div>
       )}
     </section>
   );
@@ -671,7 +742,7 @@ function Drills({ progress, setProgress }: { progress: Progress; setProgress: Re
         <div className="drill-decision">
           <span className="section-kicker">YOUR DECISION</span><h3>{drill.prompt}</h3>
           <div className="drill-choices">{drill.choices.map((choice, index) => <button disabled={answered} className={`${selected === index ? "selected" : ""} ${answered && index === drill.answer ? "correct" : ""}`} onClick={() => answer(index)} key={choice}><span>{String.fromCharCode(65 + index)}</span>{choice}</button>)}</div>
-          {answered && <div className={`drill-debrief ${selected === drill.answer ? "pass" : "review"}`} role="status"><b className="xp-award">READ LOGGED · +{selected === drill.answer ? 50 : 10} XP</b><strong>{selected === drill.answer ? "Clean read." : "Slow the inference down."}</strong>{drill.debrief.map((item) => <p key={item}>{item}</p>)}<div className="debrief-actions"><button onClick={() => setActive(nextDrill.id)}>Next simulation →</button><button onClick={() => setProgress((current) => { const next = { ...current.drillAnswers }; delete next[drill.id]; return { ...current, drillAnswers: next }; })}>Reset this drill</button></div></div>}
+          {answered && <div className={`drill-debrief ${selected === drill.answer ? "pass" : "review"}`} role="status"><b className="xp-award">CURRENT DRILL VALUE · {selected === drill.answer ? 50 : 10} XP</b><strong>{selected === drill.answer ? "Clean read." : "Slow the inference down."}</strong>{drill.debrief.map((item) => <p key={item}>{item}</p>)}<div className="debrief-actions"><button onClick={() => setActive(nextDrill.id)}>Next simulation →</button><button onClick={() => setProgress((current) => { const next = { ...current.drillAnswers }; delete next[drill.id]; return { ...current, drillAnswers: next }; })}>Reset this drill</button></div></div>}
         </div>
       </section>
     </div>
@@ -724,10 +795,10 @@ function Calculators() {
         <p className="calculator-note">Educational x·y model. It does not reproduce Pump’s virtual-reserve constants, live fees, routes, or competing state changes.</p>
         <div className="calculator-body">
           <div className="input-grid">
-            <NumberField label="SOL reserve" value={reserveSol} setValue={setReserveSol} step={1} />
-            <NumberField label="Token reserve" value={reserveTokens} setValue={setReserveTokens} step={1000000} />
+            <NumberField label="SOL reserve" value={reserveSol} setValue={setReserveSol} step={1} min={0.01} />
+            <NumberField label="Token reserve" value={reserveTokens} setValue={setReserveTokens} step={1000000} min={1} />
             <NumberField label="Your buy (SOL)" value={buySol} setValue={setBuySol} step={0.1} />
-            <NumberField label="Fee (%)" value={feePct} setValue={setFeePct} step={0.05} />
+            <NumberField label="Fee (%)" value={feePct} setValue={setFeePct} step={0.05} max={99} />
           </div>
           <div className="result-board">
             <div><span>Tokens out</span><strong>{formatNumber(tokensOut, 0)}</strong></div>
@@ -741,8 +812,8 @@ function Calculators() {
         <div className="calculator-head"><span>02</span><div><p>RISK + CAPACITY</p><h2>Does the setup have a valid size?</h2></div></div>
         <div className="input-grid vertical">
           <NumberField label="Bankroll (SOL)" value={bankroll} setValue={setBankroll} step={1} />
-          <NumberField label="Allowed risk (%)" value={riskPct} setValue={setRiskPct} step={0.25} />
-          <NumberField label="Failure loss (%)" value={invalidPct} setValue={setInvalidPct} step={5} />
+          <NumberField label="Allowed risk (%)" value={riskPct} setValue={setRiskPct} step={0.25} max={100} />
+          <NumberField label="Failure loss (%)" value={invalidPct} setValue={setInvalidPct} step={5} min={0.01} max={100} />
           <NumberField label="Measured capacity (SOL)" value={capacity} setValue={setCapacity} step={0.25} />
         </div>
         <div className="compact-results"><p><span>Allowed loss</span><strong>{formatNumber(allowedLoss)} SOL</strong></p><p><span>Theoretical size</span><strong>{formatNumber(theoreticalSize)} SOL</strong></p><p><span>Capacity-capped size</span><strong>{formatNumber(executableSize)} SOL</strong></p></div>
@@ -751,7 +822,7 @@ function Calculators() {
       <section className="calculator-card">
         <div className="calculator-head"><span>03</span><div><p>EXPECTANCY</p><h2>Win rate is not the system</h2></div></div>
         <div className="input-grid vertical">
-          <NumberField label="Win rate (%)" value={winRate} setValue={setWinRate} step={1} />
+          <NumberField label="Win rate (%)" value={winRate} setValue={setWinRate} step={1} max={100} />
           <NumberField label="Average win (R)" value={avgWin} setValue={setAvgWin} step={0.25} />
           <NumberField label="Average loss (R)" value={avgLoss} setValue={setAvgLoss} step={0.25} />
           <NumberField label="Average cost (R)" value={costR} setValue={setCostR} step={0.01} />
@@ -762,8 +833,13 @@ function Calculators() {
   );
 }
 
-function NumberField({ label, value, setValue, step }: { label: string; value: number; setValue: (value: number) => void; step: number }) {
-  return <label className="number-field"><span>{label}</span><input type="number" value={value} step={step} min={0} onChange={(event) => setValue(Number(event.target.value))} /></label>;
+function NumberField({ label, value, setValue, step, min = 0, max }: { label: string; value: number; setValue: (value: number) => void; step: number; min?: number; max?: number }) {
+  const update = (rawValue: string) => {
+    const nextValue = Number(rawValue);
+    if (!Number.isFinite(nextValue)) return;
+    setValue(Math.min(max ?? Number.POSITIVE_INFINITY, Math.max(min, nextValue)));
+  };
+  return <label className="number-field"><span>{label}</span><input type="number" value={value} step={step} min={min} max={max} onChange={(event) => update(event.target.value)} /></label>;
 }
 
 function HistoryLab() {

@@ -33,10 +33,11 @@ test("server-renders the Sol Academy product shell", async () => {
 });
 
 test("ships the complete course corpus without private screenshot material", async () => {
-  const [course, labs, app, page, layout, packageJson] = await Promise.all([
+  const [course, labs, app, styles, page, layout, packageJson] = await Promise.all([
     readFile(new URL("../app/data/course.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/data/labs.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/AcademyApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -63,10 +64,17 @@ test("ships the complete course corpus without private screenshot material", asy
   assert.match(app, /TRAINING RANK/);
   assert.match(app, /SIMULATION ONLINE/);
   assert.match(app, /MODULE CLEAR/);
-  assert.match(app, /WEEKEND CORE/);
+  assert.match(app, /2-DAY CORE/);
   assert.match(app, /BONUS ARSENAL/);
   assert.match(app, /VOD LITERATE/);
   assert.match(app, /Observe.*Define.*Journal.*Test.*Alert.*Automate/s);
+  assert.match(app, /<Quiz key=\{module\.id\}/);
+  assert.match(app, /function hydrateProgress/);
+  assert.match(app, /CURRENT DRILL VALUE/);
+  assert.match(app, /Math\.max\(current\.diagnosticScore \?\? 0, score\)/);
+  assert.match(styles, /@keyframes pageEnter/);
+  assert.match(styles, /@keyframes cardEnter/);
+  assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(page, /<AcademyApp \/>/);
   assert.match(layout, /Sol Academy/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
