@@ -67,6 +67,7 @@ export type Drill = {
   title: string;
   label: string;
   setup: string;
+  chat?: string;
   metrics: { label: string; value: string; tone?: "good" | "bad" | "neutral" }[];
   prompt: string;
   choices: string[];
@@ -966,7 +967,7 @@ export const modules: Module[] = [
         eyebrow: "Breakouts",
         title: "Wick, reclaim, hold, fail",
         body: [
-          "A wick records a rejected extreme, not a guaranteed reversal. A reclaim matters when price returns through a level with follow-through. A breakout is stronger when it holds on retest and maker growth continues; it is weaker when the move depends on one wallet and immediately falls back into the range.",
+          "A wick proves that price traded beyond the candle body and closed away from that extreme; rejection is the hypothesis, not an identity claim or guaranteed reversal. A reclaim matters when price returns through a level with follow-through. A breakout is stronger when it holds on retest and maker growth continues; it is weaker when the move depends on one wallet and immediately falls back into the range.",
           "Your job is not to label patterns after the fact. Write the expected response before the event: ‘If buyers are real, this sell should be absorbed and the prior high should hold within two minutes.’",
         ],
         example: "Entry near 6K, wick to 13K, exit around 9.2K can be excellent execution if the thesis was short-horizon momentum. Missing the top is not an error; violating the setup is.",
@@ -984,7 +985,7 @@ export const modules: Module[] = [
     takeaways: [
       "Read price response relative to depth and flow.",
       "Volume with diminishing progress can signal exhaustion.",
-      "A wick is evidence of rejection, not a complete trade thesis.",
+      "A wick records an intrainterval excursion; rejection needs lower-timeframe flow and follow-through.",
       "Write the expected next response before it occurs.",
     ],
     quiz: [

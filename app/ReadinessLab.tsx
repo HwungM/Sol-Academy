@@ -12,6 +12,8 @@ import {
   type ReadinessScenario,
   type TerminalSnapshot as TerminalSnapshotData,
 } from "./data/readiness";
+import { candleScenarios } from "./data/candles";
+import { CandleChart } from "./CandleLab";
 
 type ReadinessTab = "brief" | "practice" | "exam";
 
@@ -62,6 +64,7 @@ function TerminalSnapshot({ scenario }: { scenario: ReadinessScenario }) {
   const fields = scenario.snapshot
     ? snapshotFields.filter(([key]) => Boolean(scenario.snapshot?.[key]))
     : [];
+  const chart = candleScenarios.find((item) => item.id === scenario.snapshot?.chartId);
 
   return (
     <section className="terminal-snapshot" aria-label={`Terminal snapshot for ${scenario.title}`}>
@@ -94,9 +97,11 @@ function TerminalSnapshot({ scenario }: { scenario: ReadinessScenario }) {
             <p>This decision depends on the written evidence, not a chart.</p>
           </div>
         )}
-        <div className="terminal-tape" aria-hidden="true">
-          <span /><span /><span /><span /><span /><span /><span /><span /><span /><span />
-        </div>
+        {chart ? <div className="readiness-candle-chart"><CandleChart scenario={chart} compact showVolume /></div> : (
+          <div className="terminal-tape" aria-hidden="true">
+            <span /><span /><span /><span /><span /><span /><span /><span /><span /><span />
+          </div>
+        )}
       </div>
       <footer className="terminal-snapshot-footer">
         <span>Execution disabled</span><span>Training environment</span>

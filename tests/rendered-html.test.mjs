@@ -198,6 +198,54 @@ test("ships the Day 3 performance curriculum and evidence rubric", async () => {
   assert.match(app, /Math\.min\(\(progress\.readinessExamBest \?\? 0\) \/ 85, 1\)/);
 });
 
+test("ships interactive candlestick literacy and evidence-translated trench language", async () => {
+  const [candles, candleLab, slang, labs, readiness, readinessLab, app] = await Promise.all([
+    readFile(new URL("../app/data/candles.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/CandleLab.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/data/slang.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/data/labs.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/data/readiness.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/ReadinessLab.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/AcademyApp.tsx", import.meta.url), "utf8"),
+  ]);
+
+  const scenarioIds = [...candles.matchAll(/^\s+id:\s*"([^"]+)",/gm)].map((match) => match[1]);
+  assert.deepEqual(scenarioIds, ["anatomy", "thin-impulse", "failed-breakout", "absorption", "effort-result", "bond-fullclip"]);
+
+  const candleRows = [...candles.matchAll(/\{\s*time:\s*"[^"]+",\s*open:\s*([0-9.]+),\s*high:\s*([0-9.]+),\s*low:\s*([0-9.]+),\s*close:\s*([0-9.]+),\s*volume:\s*([0-9.]+)\s*\}/g)];
+  assert.ok(candleRows.length >= 50, "the candle bank should contain enough bars to show complete sequences");
+  for (const [, openText, highText, lowText, closeText, volumeText] of candleRows) {
+    const [open, high, low, close, volume] = [openText, highText, lowText, closeText, volumeText].map(Number);
+    assert.ok(high >= Math.max(open, close), "each high must contain the candle body");
+    assert.ok(low <= Math.min(open, close), "each low must contain the candle body");
+    assert.ok(volume >= 0, "candle volume cannot be negative");
+  }
+
+  assert.match(candleLab, /open .* high .* low .* close .* volume/is);
+  assert.match(candleLab, /aria-label=\{onSelect \? label/);
+  assert.match(candleLab, /TRENCH → EVIDENCE/);
+  assert.match(candleLab, /Six fast simulations/);
+  assert.match(app, /type LabTab = "calculators" \| "candles" \| "history" \| "vod"/);
+  assert.match(app, /module\.id === "tape" && <CandlePrimer/);
+  assert.match(app, /tab === "candles" && <CandleLab/);
+
+  assert.equal((readiness.match(/chartId:\s*"/g) ?? []).length, 5);
+  for (const id of ["absorption", "effort-result", "thin-impulse", "failed-breakout"]) {
+    assert.match(readiness, new RegExp(`chartId: "${id}"`));
+  }
+  assert.match(readinessLab, /<CandleChart scenario=\{chart\} compact showVolume/);
+
+  for (const term of ["Candle", "Candle body", "OHLC", "Timeframe", "Volume bar", "Ape", "Bag", "PvP", "Roundtrip", "Runner", "Top-blast"]) {
+    assert.match(labs, new RegExp(`term: "${term}"`), `the glossary should define ${term}`);
+  }
+  assert.ok((slang.match(/\bphrase:\s*"/g) ?? []).length >= 28, "the contextual language layer should cover the full curriculum");
+  assert.ok((slang.match(/\boperatorTranslation:\s*"/g) ?? []).length >= 28);
+  assert.ok((slang.match(/\bdoesNotProve:\s*"/g) ?? []).length >= 28);
+  for (const coreModule of ["game-map", "money-math", "lifecycle", "terminal", "wallets", "narrative", "tape", "risk"]) {
+    assert.match(slang, new RegExp(`(?:"${coreModule}"|${coreModule}): \\[`), `${coreModule} should receive contextual language`);
+  }
+});
+
 test("all source-library links are valid absolute URLs", async () => {
   const course = await readFile(new URL("../app/data/course.ts", import.meta.url), "utf8");
   const sourceBlock = course.slice(course.indexOf("export const sources"), course.indexOf("export const sourceMap"));

@@ -18,10 +18,13 @@ The product includes:
 - progressive historical replays that reveal one checkpoint only after the learner locks a Skip, Watch, Paper entry, Add, Trim, or Exit decision with a rationale
 - a structured VOD notebook scored across eight dimensions, with evidence grades and explicit fields for state, trigger, size/risk, invalidation, exit plan, and the skipped alternative
 - cross-platform translation between terminal labels and the underlying operator questions
+- an interactive six-case candlestick lab covering OHLC anatomy, volume, thin-liquidity impulses, failed breakouts, absorption, exhaustion, and bond-event volatility
+- real candlestick charts inside the Day 3 Tape cases rather than decorative bars
 - learning-based XP, six operator ranks, missions, and mastery achievements
 - market-cap, liquidity, price-impact, position-sizing, and expectancy calculators
 - historical studies covering the late-2023 through early-2025 Solana cycle and newer 2026 evidence
-- a searchable trench-language glossary
+- a research-backed trench-language layer throughout every module, with public Reddit/X usage translated into observable evidence and explicit “does not prove” warnings
+- a searchable glossary covering candle mechanics and current phrases such as trenching, clicking, PvP, prebond, fullclip, dev out, deriv, vamp, god candle, roundtrip, and top-blast
 - local progress and VOD notes with JSON export
 - an evidence library linking claims to primary documentation, on-chain research, and clearly labeled secondary reporting
 - a commissioned 32-piece editorial image system for modules, drills, history cases, and major workspaces; see [the art direction](docs/art-direction.md)

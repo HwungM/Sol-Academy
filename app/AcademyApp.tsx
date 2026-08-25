@@ -16,9 +16,11 @@ import { drillArt, historyArt, moduleArt, sectionArt, type ArtAsset } from "./da
 import { evidenceGrades, scoreVodAnnotationCompleteness } from "./data/vod-rubric";
 import { ProgressiveReplay } from "./ProgressiveReplay";
 import { ReadinessLab, type ReadinessExamResult } from "./ReadinessLab";
+import { CandleLab, CandlePrimer } from "./CandleLab";
+import { TrenchDecoder } from "./TrenchDecoder";
 
 type View = "dashboard" | "path" | "module" | "readiness" | "drills" | "lab" | "glossary" | "sources";
-type LabTab = "calculators" | "history" | "vod";
+type LabTab = "calculators" | "candles" | "history" | "vod";
 
 type VodEntry = {
   id: string;
@@ -448,6 +450,7 @@ export default function AcademyApp() {
                 saveScore={saveScore}
                 saveNote={(note) => setProgress((current) => ({ ...current, notes: { ...current.notes, [activeModule.id]: note } }))}
                 openModule={openModule}
+                openLab={openLab}
                 back={() => navigate("path")}
               />
             )}
@@ -741,7 +744,7 @@ function Curriculum({ progress, openModule, openReadiness }: { progress: Progres
       </section>
 
       <section className={`day3-curriculum-card ${curriculum.vodLiterate ? "complete" : ""}`}>
-        <div><p className="eyebrow">DAY 3 · PERFORMANCE GATE</p><h2>Prove it on material you have not memorized.</h2><p>Work through cross-platform screen translation, a 24-case practice deck, a distinct unseen exam, and two complete VOD annotations. This—not quiz completion—earns VOD Literate.</p></div>
+        <div><p className="eyebrow">DAY 3 · PERFORMANCE GATE</p><h2>Prove it on material you have not memorized.</h2><p>Work through cross-platform screen translation, a 16-case practice deck, a distinct unseen exam, and two complete VOD annotations. This—not quiz completion—earns VOD Literate.</p></div>
         <div className="day3-gate-metrics"><span><b>{progress.readinessExamBest ?? 0}%</b> best exam</span><span><b>{curriculum.qualityVodNotes}/2</b> complete notes</span><span><b>{curriculum.vodLiterate ? "PASS" : "OPEN"}</b> gate</span></div>
         <button className="primary-action" onClick={openReadiness}>{curriculum.vodLiterate ? "Review Day 3" : "Enter Day 3"}<span>→</span></button>
       </section>
@@ -766,6 +769,7 @@ function ModuleView({
   saveScore,
   saveNote,
   openModule,
+  openLab,
   back,
 }: {
   module: Module;
@@ -773,6 +777,7 @@ function ModuleView({
   saveScore: (id: string, score: number) => void;
   saveNote: (note: string) => void;
   openModule: (id: string) => void;
+  openLab: (tab: LabTab) => void;
   back: () => void;
 }) {
   const index = modules.findIndex((item) => item.id === module.id);
@@ -794,6 +799,7 @@ function ModuleView({
         </div>
       </header>
       <nav className="module-section-strip" aria-label="Module sections">{module.sections.map((section, itemIndex) => <a href={`#section-${itemIndex}`} key={section.title}><span>{String(itemIndex + 1).padStart(2, "0")}</span>{section.title}</a>)}</nav>
+      {module.id === "tape" && <CandlePrimer onOpenLab={() => openLab("candles")} />}
 
       <div className="lesson-layout">
         <article className="lesson-content">
@@ -810,6 +816,8 @@ function ModuleView({
               {section.sources && <SourceChips ids={section.sources} />}
             </section>
           ))}
+
+          <TrenchDecoder moduleId={module.id} />
 
           <section className="takeaway-panel">
             <p className="section-kicker">LOCK IT IN</p><h2>What leaves the room with you</h2>
@@ -893,6 +901,7 @@ function Drills({ progress, setProgress }: { progress: Progress; setProgress: Re
       <section className="drill-stage">
         <div className="drill-context">
           <p className="eyebrow">{drill.label.toUpperCase()} · {drill.skill.toUpperCase()}</p><h2>{drill.title}</h2><p>{drill.setup}</p>
+          {drill.chat && <div className="drill-chat"><span>WHAT THE CHAT SAYS</span><blockquote>{drill.chat}</blockquote><p>Translate the claim into observable fields before answering.</p></div>}
           <ArtFrame asset={drillArt[drill.id]} className="drill-art" />
           <div className="metric-board">{drill.metrics.map((metric) => <div className={metric.tone ?? "neutral"} key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div>
         </div>
@@ -909,9 +918,10 @@ function Drills({ progress, setProgress }: { progress: Progress; setProgress: Re
 function OperatorLab({ tab, setTab, progress, setProgress }: { tab: LabTab; setTab: (tab: LabTab) => void; progress: Progress; setProgress: React.Dispatch<React.SetStateAction<Progress>> }) {
   return (
     <div className="page lab-page">
-      <PageLead eyebrow="OPERATOR LAB" title="Calculate, replay, annotate." body="Use toy models to build intuition, timestamped history to fight hindsight, and a structured worksheet to extract decisions from public VODs." art={sectionArt.lab} />
-      <div className="lab-tabs">{(["calculators", "history", "vod"] as LabTab[]).map((item) => <button className={tab === item ? "active" : ""} onClick={() => setTab(item)} key={item}>{item === "calculators" ? "Math desk" : item === "history" ? "Historical tape" : "VOD notebook"}</button>)}</div>
+      <PageLead eyebrow="OPERATOR LAB" title="Calculate, read candles, replay, annotate." body="Use toy models to build intuition, six fictional candle simulations to read flow, timestamped history to fight hindsight, and a structured worksheet to extract decisions from public VODs." art={sectionArt.lab} />
+      <div className="lab-tabs">{(["calculators", "candles", "history", "vod"] as LabTab[]).map((item) => <button className={tab === item ? "active" : ""} onClick={() => setTab(item)} key={item}>{item === "calculators" ? "Math desk" : item === "candles" ? "Candle lab" : item === "history" ? "Historical tape" : "VOD notebook"}</button>)}</div>
       {tab === "calculators" && <Calculators />}
+      {tab === "candles" && <CandleLab />}
       {tab === "history" && <HistoryLab />}
       {tab === "vod" && <VodNotebook progress={progress} setProgress={setProgress} />}
     </div>
