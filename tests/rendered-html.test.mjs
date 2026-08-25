@@ -22,14 +22,15 @@ test("server-renders the Sol Academy product shell", async () => {
   const html = await response.text();
   assert.match(html, /<title>Sol Academy/);
   assert.match(html, /Command center/);
-  assert.match(html, /LOCAL MODE/);
+  assert.match(html, />LOCAL</);
   assert.match(html, /Loading your academy/);
   assert.doesNotMatch(html, /codex-preview/);
   assert.doesNotMatch(html, /react-loading-skeleton/);
 
   const academySource = await readFile(new URL("../app/AcademyApp.tsx", import.meta.url), "utf8");
-  assert.match(academySource, /Understand the screen/);
+  assert.match(academySource, /Read the market/);
   assert.match(academySource, /DECISION STACK/);
+  assert.match(academySource, /reference-workspace/);
 });
 
 test("ships the complete course corpus without private screenshot material", async () => {
@@ -64,7 +65,7 @@ test("ships the complete course corpus without private screenshot material", asy
   assert.match(app, /TRAINING RANK/);
   assert.match(app, /SIMULATION ONLINE/);
   assert.match(app, /MODULE CLEAR/);
-  assert.match(app, /2-DAY CORE/);
+  assert.match(app, /CORE PATH/);
   assert.match(app, /BONUS ARSENAL/);
   assert.match(app, /VOD LITERATE/);
   assert.match(app, /Observe.*Define.*Journal.*Test.*Alert.*Automate/s);
@@ -72,11 +73,15 @@ test("ships the complete course corpus without private screenshot material", asy
   assert.match(app, /function hydrateProgress/);
   assert.match(app, /CURRENT DRILL VALUE/);
   assert.match(app, /Math\.max\(current\.diagnosticScore \?\? 0, score\)/);
-  assert.match(styles, /@keyframes pageEnter/);
-  assert.match(styles, /@keyframes cardEnter/);
+  assert.match(styles, /@keyframes routeEnter/);
+  assert.match(styles, /@keyframes detailEnter/);
+  assert.match(styles, /\.module-list/);
+  assert.match(styles, /\.reference-workspace/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(page, /<AcademyApp \/>/);
   assert.match(layout, /Sol Academy/);
+  assert.match(layout, /Instrument_Sans/);
+  assert.match(layout, /IBM_Plex_Mono/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 
   const publicSurface = `${course}\n${labs}\n${app}`;

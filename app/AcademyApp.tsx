@@ -242,6 +242,19 @@ export default function AcademyApp() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [labTab, setLabTab] = useState<LabTab>("calculators");
 
+  useEffect(() => {
+    const openGlossary = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (event.key.toLowerCase() !== "g" || event.metaKey || event.ctrlKey || event.altKey) return;
+      setView("glossary");
+      setMobileOpen(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("keydown", openGlossary);
+    return () => window.removeEventListener("keydown", openGlossary);
+  }, []);
+
   const curriculumStats = useMemo(() => getCurriculumStats(progress), [progress]);
   const completion = curriculumStats.corePct;
   const operatorStats = useMemo(() => getOperatorStats(progress), [progress]);
@@ -276,6 +289,9 @@ export default function AcademyApp() {
   };
 
   const nextIncomplete = curriculumStats.nextCore ?? curriculumStats.nextBonus ?? modules[0];
+  const currentViewLabel = view === "module"
+    ? `Module ${String(activeModule.number).padStart(2, "0")} · ${activeModule.shortTitle}`
+    : navItems.find((item) => item.view === view)?.label ?? "Command center";
 
   return (
     <div className="academy-shell">
@@ -290,17 +306,32 @@ export default function AcademyApp() {
         </div>
 
         <nav className="side-nav" aria-label="Primary navigation">
-          <p className="nav-label">LEARN / OPERATE</p>
-          {navItems.map((item) => (
-            <button
-              key={item.view}
-              className={view === item.view || (view === "module" && item.view === "path") ? "active" : ""}
-              onClick={() => navigate(item.view)}
-              aria-current={view === item.view || (view === "module" && item.view === "path") ? "page" : undefined}
-            >
-              <span>{item.mark}</span>{item.label}
-            </button>
-          ))}
+          <div className="nav-group">
+            <p className="nav-label">ACADEMY</p>
+            {navItems.slice(0, 3).map((item) => (
+              <button
+                key={item.view}
+                className={view === item.view || (view === "module" && item.view === "path") ? "active" : ""}
+                onClick={() => navigate(item.view)}
+                aria-current={view === item.view || (view === "module" && item.view === "path") ? "page" : undefined}
+              >
+                <span>{item.mark}</span>{item.label}
+              </button>
+            ))}
+          </div>
+          <div className="nav-group">
+            <p className="nav-label">FIELD TOOLS</p>
+            {navItems.slice(3).map((item) => (
+              <button
+                key={item.view}
+                className={view === item.view ? "active" : ""}
+                onClick={() => navigate(item.view)}
+                aria-current={view === item.view ? "page" : undefined}
+              >
+                <span>{item.mark}</span>{item.label}
+              </button>
+            ))}
+          </div>
         </nav>
 
         <div className="sidebar-progress">
@@ -322,15 +353,16 @@ export default function AcademyApp() {
       <main id="academy-content" className="main-stage">
         <header className="topbar">
           <button className="mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation" aria-controls="academy-navigation" aria-expanded={mobileOpen}>MENU</button>
-          <div className="topbar-status"><i /> <span>LOCAL MODE</span><b>Progress stays in your browser</b></div>
-          <div className="topbar-tape" aria-label="Simulated market telemetry"><span>SIM</span><b>MC 42.8K</b><i>LIQ 11.4K</i><em>FLOW +17%</em></div>
+          <div className="topbar-breadcrumb"><span>SOL ACADEMY</span><b>/</b><strong>{currentViewLabel}</strong></div>
+          <button className="topbar-search" onClick={() => navigate("glossary")}><span>Search field glossary</span><kbd>G</kbd></button>
+          <div className="topbar-status"><i /> <span>LOCAL</span><b>Progress stays on this device</b></div>
           <div className="topbar-rank"><span>{operatorStats.rank.code}</span><strong>{operatorStats.rank.name}</strong><b>{operatorStats.xp} XP</b></div>
         </header>
 
         {!hydrated ? (
           <div className="loading-state"><span /><p>Loading your academy…</p></div>
         ) : (
-          <>
+          <div className="route-stage" key={`${view}:${view === "module" ? activeModuleId : labTab}`}>
             {view === "dashboard" && (
               <Dashboard
                 progress={progress}
@@ -366,7 +398,7 @@ export default function AcademyApp() {
             )}
             {view === "glossary" && <Glossary />}
             {view === "sources" && <Sources />}
-          </>
+          </div>
         )}
       </main>
     </div>
@@ -410,21 +442,39 @@ function Dashboard({
 
   return (
     <div className="page dashboard-page">
-      <section className="hero-grid">
-        <div className="hero-copy">
-          <p className="eyebrow"><span>◆</span> 2-DAY CORE // VOD LITERACY</p>
-          <h1>Understand the screen.<br /><em>In two focused days.</em><br />Build your edge next.</h1>
-          <p className="hero-lead">Eight focused modules teach the minimum mechanics, wallet evidence, crowd behavior, and risk logic needed to follow fast memecoin VODs. Everything afterward is your bonus arsenal.</p>
-          <div className="hero-actions">
-            <button className="primary-action" onClick={() => openModule(nextModule.id)}>{allComplete ? "Replay Core" : curriculum.coreReady ? "Enter Bonus" : "Continue Core Path"}: {nextModule.shortTitle}<span>→</span></button>
-            <button className="ghost-action" onClick={() => navigate("drills")}>Test my screen literacy</button>
-          </div>
-          <div className="hero-proof">
-            <span><strong>{curriculum.coreTotal}</strong> core modules</span>
-            <span><strong>{Math.floor(weekendLessonMinutes / 60)}H{String(weekendLessonMinutes % 60).padStart(2, "0")}</strong> lesson clock</span>
-            <span><strong>{curriculum.bonusTotal}</strong> bonus modules</span>
-          </div>
+      <header className="dashboard-intro">
+        <div>
+          <p className="eyebrow"><span>◆</span> CORE PATH / SESSION BRIEF</p>
+          <h1>Read the market.<br />Then build the machine.</h1>
+          <p>Eight core modules get you fluent enough to follow fast memecoin VODs. The bonus track shows how a manual read becomes a measured method, then guarded automation.</p>
         </div>
+        <div className="dashboard-intro-meta">
+          <div><span>CORE CLEARANCE</span><strong>{curriculum.corePassed}<small> / {curriculum.coreTotal}</small></strong></div>
+          <div><span>LESSON CLOCK</span><strong>{Math.floor(weekendLessonMinutes / 60)}<small>H</small>{String(weekendLessonMinutes % 60).padStart(2, "0")}</strong></div>
+          <button className="primary-action" onClick={() => openModule(nextModule.id)}>{allComplete ? "Replay core" : curriculum.coreReady ? "Enter bonus" : "Resume training"}<span>→</span></button>
+        </div>
+      </header>
+
+      <section className="command-grid" aria-label="Current learning workspace">
+        <article className="current-mission">
+          <div className="panel-command"><span>CURRENT OBJECTIVE</span><b>{curriculum.coreReady ? "BONUS" : `DAY ${nextModule.weekendDay ?? "—"}`}</b></div>
+          <div className="mission-module-code">M{String(nextModule.number).padStart(2, "0")}</div>
+          <p className="mission-track">{nextModule.track === "Weekend Core" ? "CORE PATH" : "BONUS ARSENAL"} · {nextModule.duration}</p>
+          <h2>{nextModule.title}</h2>
+          <p className="mission-outcome">{nextModule.outcome}</p>
+          <div className="mission-controls">
+            <button className="primary-action" onClick={() => openModule(nextModule.id)}>Continue module <span>→</span></button>
+            <button className="text-action" onClick={() => navigate("path")}>Open full path</button>
+          </div>
+          <div className="mission-progress" role="progressbar" aria-label="Core VOD readiness" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completion)}><span><b>{Math.round(completion)}%</b> VOD READINESS</span><i><b style={{ width: `${completion}%` }} /></i></div>
+          <div className="core-track" aria-label="Core module progress">
+            {weekendCoreModules.map((courseModule) => {
+              const complete = progress.completed.includes(courseModule.id);
+              const current = courseModule.id === nextModule.id;
+              return <button key={courseModule.id} className={`${complete ? "complete" : ""} ${current ? "current" : ""}`} onClick={() => openModule(courseModule.id)} aria-label={`Open module ${courseModule.number}: ${courseModule.title}`}><span>{String(courseModule.number).padStart(2, "0")}</span><i /></button>;
+            })}
+          </div>
+        </article>
 
         <div className="signal-console" role="img" aria-label="Simulated trading-terminal chart showing the five-stage decision stack">
           <div className="console-head"><span>DECISION STACK</span><b>NO AUTOBUY</b></div>
@@ -445,9 +495,28 @@ function Dashboard({
             <li><span>05</span><div><strong>EXECUTION STATE</strong><small>Bound, fee, tip, confirmation</small></div><b>LAST</b></li>
           </ol>
         </div>
+
+        <aside className="session-queue">
+          <div className="panel-command"><span>SESSION QUEUE</span><b>{stats.xp} XP</b></div>
+          <button onClick={() => navigate("drills")}>
+            <span>01</span><div><small>DECISION DRILL</small><strong>{nextDrill ? nextDrill.label : "Replay the drill deck"}</strong><p>{stats.correctDrills}/{drills.length} clean reads</p></div><b>→</b>
+          </button>
+          <button onClick={() => openLab("vod")}>
+            <span>02</span><div><small>TAPE WORK</small><strong>Log a VOD decision</strong><p>{progress.vodEntries.length} evidence-grade reads</p></div><b>→</b>
+          </button>
+          <button onClick={() => navigate("glossary")}>
+            <span>03</span><div><small>QUICK REFERENCE</small><strong>Decode trench language</strong><p>{glossary.length} field terms</p></div><b>→</b>
+          </button>
+          <div className="queue-rule"><span>OPERATOR RULE</span><p>Speed amplifies a decision. It cannot make the decision intelligent.</p></div>
+        </aside>
       </section>
 
-      <section className="operator-hud" aria-label="Operator progression and missions">
+      <section className="method-strip" aria-label="Method development loop">
+        <div><span>THE EDGE FACTORY</span><strong>Observation becomes automation only after it survives measurement.</strong></div>
+        <ol>{["Observe", "Define", "Journal", "Test", "Alert", "Automate"].map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, "0")}</span>{step}</li>)}</ol>
+      </section>
+
+      <section className="operator-hud" aria-label="Operator progression">
         <div className="rank-console">
           <div className="rank-code">{stats.rank.code}</div>
           <div className="rank-copy">
@@ -459,41 +528,9 @@ function Dashboard({
           <div className="rank-track" role="progressbar" aria-label="Progress to next operator rank" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(stats.rankProgress)}><i style={{ width: `${stats.rankProgress}%` }} /></div>
         </div>
 
-        <div className="mission-deck">
-          <button onClick={() => openModule(nextModule.id)}>
-            <span>{allComplete ? "REPLAY MISSION" : curriculum.coreReady ? "BONUS MISSION" : "CORE MISSION"}</span><strong>{allComplete ? "Replay the foundation" : `Clear M${String(nextModule.number).padStart(2, "0")}`}</strong><small>{allComplete ? "Review · no additional XP" : `+100 XP · ${nextModule.shortTitle}`}</small><b>OPEN →</b>
-          </button>
-          <button onClick={() => navigate("drills")} className={!nextDrill ? "cleared" : ""}>
-            <span>FIELD READ</span><strong>{nextDrill ? nextDrill.label : "Drill deck cleared"}</strong><small>{stats.correctDrills}/{drills.length} clean reads</small><b>{nextDrill ? "RUN →" : "REPLAY →"}</b>
-          </button>
-          <button onClick={() => openLab("vod")} className={progress.vodEntries.length >= 3 ? "cleared" : ""}>
-            <span>TAPE WORK</span><strong>Log a VOD decision</strong><small>{progress.vodEntries.length} evidence-grade reads saved</small><b>LOG →</b>
-          </button>
-        </div>
-
         <div className="badge-rack">
           <div><span>ACHIEVEMENTS</span><strong>{badges.filter((badge) => badge.unlocked).length}/{badges.length} UNLOCKED</strong></div>
           <ul>{badges.map((badge) => <li className={badge.unlocked ? "unlocked" : ""} key={badge.label} title={badge.label}><b>{badge.unlocked ? "✓" : badge.mark}</b><span>{badge.label}</span></li>)}</ul>
-        </div>
-      </section>
-
-      <section className="dashboard-strip">
-        <div className="completion-card">
-          <div className="section-label">2-DAY CORE</div>
-          <div className="completion-head"><strong>{Math.round(completion)}%</strong><span>VOD readiness</span></div>
-          <div className="wide-progress"><i style={{ width: `${completion}%` }} /></div>
-          <p>{curriculum.coreReady ? "VOD LITERATE. You can now follow the screen; the Bonus Arsenal deepens your method." : curriculum.corePassed === 0 ? "Start with the game map. Budget roughly five focused hours per day." : `${curriculum.corePassed}/${curriculum.coreTotal} core modules passed at ${passScore}% or better.`}</p>
-        </div>
-        <div className="reality-card">
-          <div className="section-label">THE EDGE FACTORY</div>
-          <blockquote>Observe → define → journal → test → alert → automate.</blockquote>
-          <p>The design space is enormous because you can combine a universe, state, evidence rule, trigger, size, and exit. Profitable edges are scarce, though: a bot multiplies a measured method; it does not supply one.</p>
-        </div>
-        <div className="continue-card">
-          <div className="section-label">{allComplete ? "REPLAY GATE" : curriculum.coreReady ? "BONUS GATE" : "NEXT CORE GATE"}</div>
-          <span className="module-number">{String(nextModule.number).padStart(2, "0")}</span>
-          <div><strong>{nextModule.shortTitle}</strong><small>{nextModule.duration} · {nextModule.difficulty}</small></div>
-          <button onClick={() => openModule(nextModule.id)} aria-label={`Open ${nextModule.title}`}>→</button>
         </div>
       </section>
 
@@ -562,16 +599,18 @@ function Diagnostic({ progress, setProgress }: { progress: Progress; setProgress
 function Curriculum({ progress, openModule }: { progress: Progress; openModule: (id: string) => void }) {
   const curriculum = getCurriculumStats(progress);
   const renderModuleCards = (courseModules: Module[]) => (
-    <div className="module-grid">
+    <div className="module-list">
       {courseModules.map((courseModule) => {
         const completed = progress.completed.includes(courseModule.id);
         const score = progress.scores[courseModule.id];
+        const current = courseModule.id === (curriculum.nextCore?.id ?? curriculum.nextBonus?.id);
         return (
-          <article className={`module-card ${completed ? "complete" : ""}`} key={courseModule.id}>
-            <div className="module-card-top"><span>{String(courseModule.number).padStart(2, "0")}</span><b>{completed ? "PASSED" : courseModule.track === "Weekend Core" ? `CORE · DAY ${courseModule.weekendDay}` : "BONUS"}</b></div>
-            <h3>{courseModule.title}</h3><p>{courseModule.outcome}</p>
-            <div className="module-meta"><span>{courseModule.duration}</span><span>{courseModule.quiz.length} checks</span>{score !== undefined && <span>Best {score}%</span>}</div>
-            <button onClick={() => openModule(courseModule.id)}>{completed ? "Review module" : "Open module"}<span>→</span></button>
+          <article className={`module-row ${completed ? "complete" : ""} ${current ? "current" : ""}`} key={courseModule.id}>
+            <div className="module-node"><i />{completed && <b>✓</b>}</div>
+            <div className="module-row-code"><span>M{String(courseModule.number).padStart(2, "0")}</span><small>{courseModule.duration}</small></div>
+            <div className="module-row-copy"><div><b>{completed ? "PASSED" : current ? "UP NEXT" : courseModule.track === "Weekend Core" ? `DAY ${courseModule.weekendDay}` : "BONUS"}</b>{score !== undefined && <small>BEST {score}%</small>}</div><h3>{courseModule.title}</h3><p>{courseModule.outcome}</p></div>
+            <div className="module-row-meta"><span>{courseModule.quiz.length} checks</span><span>{courseModule.difficulty}</span></div>
+            <button onClick={() => openModule(courseModule.id)} aria-label={`${completed ? "Review" : "Open"} ${courseModule.title}`}><span>{completed ? "Review" : current ? "Continue" : "Open"}</span><b>→</b></button>
           </article>
         );
       })}
@@ -580,7 +619,7 @@ function Curriculum({ progress, openModule }: { progress: Progress; openModule: 
 
   return (
     <div className="page curriculum-page">
-      <PageLead eyebrow="2-DAY CORE + BONUS ARSENAL" title="Understand the trenches in two focused days." body={`Finish Modules 01–08 in ${Math.floor(weekendLessonMinutes / 60)}h ${weekendLessonMinutes % 60}m of lesson time—roughly 9–10 focused hours with checks and breaks. Modules 09–12 deepen the craft; they are not prerequisites for understanding a VOD.`} />
+      <PageLead eyebrow="CORE PATH + BONUS ARSENAL" title="Two days to screen literacy. The edge comes after." body={`Finish Modules 01–08 in ${Math.floor(weekendLessonMinutes / 60)}h ${weekendLessonMinutes % 60}m of lesson time—roughly 9–10 focused hours with checks and breaks. Modules 09–12 deepen the craft; they are not prerequisites for understanding a VOD.`} />
 
       <section className="weekend-status-panel">
         <div><span>CORE STATUS</span><strong>{curriculum.coreReady ? "VOD LITERATE" : `${curriculum.corePassed}/${curriculum.coreTotal} CORE CLEARED`}</strong><p>{curriculum.coreReady ? "You have cleared the comprehension path. Move into the Bonus Arsenal to discover, test, and automate a method." : "Pass each core knowledge check at 75% or better. The goal is screen legibility—not instant profitability."}</p></div>
@@ -632,12 +671,15 @@ function ModuleView({
     <div className="page module-page">
       <button className="back-link" onClick={back}>← Curriculum</button>
       <header className="module-hero">
-        <div className="module-index">MODULE {String(module.number).padStart(2, "0")} / {String(modules.length).padStart(2, "0")}</div>
-        <p className="eyebrow">{module.track === "Weekend Core" ? "CORE PATH" : module.track.toUpperCase()}{module.weekendDay ? ` · DAY ${module.weekendDay}` : ""} · {module.duration.toUpperCase()}</p>
-        <h1>{module.title}</h1>
-        <p>{module.kicker}</p>
-        <div className="outcome-box"><span>OUTCOME</span><p>{module.outcome}</p><b>{passed ? "PASSED" : (progress.scores[module.id] !== undefined ? `BEST ${progress.scores[module.id]}%` : "NOT SCORED")}</b></div>
+        <div className="module-heading">
+          <div className="module-index">MODULE {String(module.number).padStart(2, "0")} / {String(modules.length).padStart(2, "0")}</div>
+          <p className="eyebrow">{module.track === "Weekend Core" ? "CORE PATH" : module.track.toUpperCase()}{module.weekendDay ? ` · DAY ${module.weekendDay}` : ""} · {module.duration.toUpperCase()}</p>
+          <h1>{module.title}</h1>
+          <p>{module.kicker}</p>
+        </div>
+        <div className="outcome-box"><span>SESSION OUTCOME</span><p>{module.outcome}</p><b>{passed ? "PASSED" : (progress.scores[module.id] !== undefined ? `BEST ${progress.scores[module.id]}%` : "NOT SCORED")}</b></div>
       </header>
+      <nav className="module-section-strip" aria-label="Module sections">{module.sections.map((section, itemIndex) => <a href={`#section-${itemIndex}`} key={section.title}><span>{String(itemIndex + 1).padStart(2, "0")}</span>{section.title}</a>)}</nav>
 
       <div className="lesson-layout">
         <article className="lesson-content">
@@ -925,17 +967,35 @@ function VodNotebook({ progress, setProgress }: { progress: Progress; setProgres
 function Glossary() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
+  const [selectedTerm, setSelectedTerm] = useState(glossary[0]?.term ?? "");
   const categories = ["All", ...Array.from(new Set(glossary.map((item) => item.category))).sort()];
   const filtered = useMemo(() => glossary.filter((item) => {
     const matchesQuery = `${item.term} ${item.aliases ?? ""} ${item.definition} ${item.nuance ?? ""}`.toLowerCase().includes(query.toLowerCase());
     return matchesQuery && (category === "All" || item.category === category);
   }), [query, category]);
+  const selected = filtered.find((item) => item.term === selectedTerm) ?? filtered[0];
   return (
     <div className="page glossary-page">
       <PageLead eyebrow="FIELD GLOSSARY" title="Translate trench slang into observable facts." body="Terms change across providers and desks. When a definition is not universal, the glossary tells you what to ask next." />
-      <div className="filter-bar"><label><span>SEARCH</span><input placeholder="Try: bundle, dev bot, OG…" value={query} onChange={(event) => setQuery(event.target.value)} /></label><label><span>CATEGORY</span><select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select></label><b>{filtered.length} TERMS</b></div>
-      <div className="glossary-grid">{filtered.map((item) => <article key={item.term}><div><span>{item.category}</span><h2>{item.term}</h2>{item.aliases && <small>{item.aliases}</small>}</div><p>{item.definition}</p>{item.nuance && <aside><b>NUANCE</b>{item.nuance}</aside>}</article>)}</div>
-      {filtered.length === 0 && <div className="empty-state">No term matched. Try a broader search.</div>}
+      <div className="reference-workspace">
+        <aside className="term-index">
+          <div className="term-search"><label><span>SEARCH REFERENCE</span><input placeholder="Bundle, dev bot, OG…" value={query} onChange={(event) => setQuery(event.target.value)} /></label><b>{filtered.length}</b></div>
+          <div className="term-categories" aria-label="Glossary categories">{categories.map((item) => <button className={category === item ? "active" : ""} onClick={() => setCategory(item)} key={item}>{item}</button>)}</div>
+          <div className="term-results" role="listbox" aria-label="Glossary terms">
+            {filtered.map((item, index) => <button role="option" aria-selected={selected?.term === item.term} className={selected?.term === item.term ? "selected" : ""} onClick={() => setSelectedTerm(item.term)} key={item.term}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{item.term}</strong><small>{item.category}</small></div><b>→</b></button>)}
+          </div>
+        </aside>
+        {selected ? (
+          <article className="term-detail" key={selected.term}>
+            <div className="term-detail-head"><span>{selected.category}</span><b>FIELD TERM</b></div>
+            <h2>{selected.term}</h2>
+            {selected.aliases && <p className="term-aliases">ALSO: {selected.aliases}</p>}
+            <div className="term-definition"><span>DEFINITION</span><p>{selected.definition}</p></div>
+            {selected.nuance && <aside><span>OPERATOR NUANCE</span><p>{selected.nuance}</p></aside>}
+            <div className="term-evidence-rule"><span>TRANSLATION RULE</span><p>Ask what is directly observable, which provider produced the label, and what would change the interpretation.</p></div>
+          </article>
+        ) : <div className="empty-state">No term matched. Try a broader search.</div>}
+      </div>
     </div>
   );
 }
