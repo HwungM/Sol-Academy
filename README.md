@@ -8,6 +8,7 @@ The academy has a three-day orientation and proof path, followed by optional dep
 - **Day 2 — Decision orientation:** Modules 05–08 cover wallet evidence, narratives, tape reading, and risk. Together, Days 1 and 2 contain 7h35 of lesson material, or roughly 9–10 focused hours with checks and breaks.
 - **Day 3 — Performance gate:** A 90–120 minute lab translates concepts across terminals, provides 16 guided practice scenarios, and ends with 16 different exam scenarios. Passing requires at least 85% overall, no domain below 50%, every critical-error scenario correct, and two VOD annotations scoring at least 88% for completeness.
 - **Bonus Arsenal:** Modules 09–12 deepen setup families, execution internals, automation architecture, historical replay, and VOD study after the core performance proof.
+- **Edge Foundry:** A final six-stage research lab turns a personal observation into a versioned, falsifiable paper method with an untouched holdout, evidence ledger, red-team checks, and a guarded automation boundary.
 
 The product includes:
 
@@ -25,6 +26,7 @@ The product includes:
 - historical studies covering the late-2023 through early-2025 Solana cycle and newer 2026 evidence
 - a research-backed trench-language layer throughout every module, with public Reddit/X usage translated into observable evidence and explicit “does not prove” warnings
 - a searchable glossary covering candle mechanics and current phrases such as trenching, clicking, PvP, prebond, fullclip, dev out, deriv, vamp, god candle, roundtrip, and top-blast
+- an interactive Edge Foundry that separates OG/canonical identification from trading edge, measures precision, recall, missed winners, baseline expectancy, lift, and discipline, and preserves evidence by method version across cloud sync
 - optional ChatGPT sign-in for private cloud progress across devices, with local fallback and JSON export
 - an evidence library linking claims to primary documentation, on-chain research, and clearly labeled secondary reporting
 - a commissioned 32-piece editorial image system for modules, drills, history cases, and major workspaces; see [the art direction](docs/art-direction.md)
@@ -61,7 +63,8 @@ The curriculum follows a strict progression:
 3. Read attention, momentum, liquidity, execution quality, and risk from incomplete evidence.
 4. Transfer those concepts to unfamiliar screens and unseen scenarios in the Day 3 performance gate.
 5. Reconstruct real VOD decisions without hindsight leakage or invented evidence.
-6. Use progressive replay and a journal to form, test, and quantify a manual setup before considering automation.
+6. Use progressive replay and the Edge Foundry to specify a causal hypothesis, freeze a filter, compare it with a baseline, and log every accepted and rejected opportunity without hindsight leakage.
+7. Automate observation, enrichment, alerts, and paper logging first; consider execution only after unseen evidence, realistic costs, capacity, and a predeclared kill condition survive review.
 
 Completing Modules 01–08 earns **Screen Oriented** status. **VOD Literate** is reserved for learners who also clear the Day 3 exam and submit two complete VOD annotations. The labels measure course performance, not profitability or readiness to risk money.
 

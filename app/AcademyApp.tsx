@@ -18,8 +18,16 @@ import { ProgressiveReplay } from "./ProgressiveReplay";
 import { ReadinessLab, type ReadinessExamResult } from "./ReadinessLab";
 import { CandleLab, CandlePrimer } from "./CandleLab";
 import { TrenchDecoder } from "./TrenchDecoder";
+import { EdgeFoundry } from "./EdgeFoundry";
+import {
+  defaultFilterConfig,
+  emptyEdgeDraft,
+  hydrateEdgeFoundryState,
+  mergeEdgeFoundryState,
+  type EdgeFoundryState,
+} from "./data/edge-foundry";
 
-type View = "dashboard" | "path" | "module" | "readiness" | "drills" | "lab" | "glossary" | "sources";
+type View = "dashboard" | "path" | "module" | "readiness" | "foundry" | "drills" | "lab" | "glossary" | "sources";
 type LabTab = "calculators" | "candles" | "history" | "vod";
 type SyncState = "local" | "loading" | "syncing" | "synced" | "offline";
 
@@ -57,6 +65,7 @@ type Progress = {
   readinessExamBest?: number;
   readinessExamDomains: Record<string, number>;
   readinessPassedAt?: string;
+  edgeFoundry: EdgeFoundryState;
 };
 
 type OperatorRank = {
@@ -96,16 +105,18 @@ const emptyProgress: Progress = {
   vodEntries: [],
   readinessPractice: {},
   readinessExamDomains: {},
+  edgeFoundry: { draft: { ...emptyEdgeDraft }, observations: [], validation: {}, filterConfig: { ...defaultFilterConfig } },
 };
 
 const navItems: { view: View; label: string; mark: string }[] = [
   { view: "dashboard", label: "Command center", mark: "01" },
   { view: "path", label: "Curriculum", mark: "02" },
   { view: "readiness", label: "Day 3 readiness", mark: "03" },
-  { view: "drills", label: "Decision drills", mark: "04" },
-  { view: "lab", label: "Operator lab", mark: "05" },
-  { view: "glossary", label: "Field glossary", mark: "06" },
-  { view: "sources", label: "Evidence library", mark: "07" },
+  { view: "foundry", label: "Edge foundry", mark: "04" },
+  { view: "drills", label: "Decision drills", mark: "05" },
+  { view: "lab", label: "Operator lab", mark: "06" },
+  { view: "glossary", label: "Field glossary", mark: "07" },
+  { view: "sources", label: "Evidence library", mark: "08" },
 ];
 
 const operatorRanks: OperatorRank[] = [
@@ -221,6 +232,7 @@ function hydrateProgress(value: unknown): Progress {
     vodEntries,
     readinessPractice,
     readinessExamDomains,
+    edgeFoundry: hydrateEdgeFoundryState(value.edgeFoundry),
     ...(diagnosticScore !== undefined ? { diagnosticScore } : {}),
     ...(readinessExamBest !== undefined ? { readinessExamBest } : {}),
     ...(readinessPassedAt !== undefined ? { readinessPassedAt } : {}),
@@ -250,6 +262,7 @@ function mergeProgress(remote: Progress, local: Progress): Progress {
     vodEntries: Array.from(vodEntries.values()),
     readinessPractice: { ...remote.readinessPractice, ...local.readinessPractice },
     readinessExamDomains,
+    edgeFoundry: mergeEdgeFoundryState(remote.edgeFoundry, local.edgeFoundry),
     diagnosticScore: Math.max(remote.diagnosticScore ?? 0, local.diagnosticScore ?? 0) || undefined,
     readinessExamBest: Math.max(remote.readinessExamBest ?? 0, local.readinessExamBest ?? 0) || undefined,
     readinessPassedAt: passedDates[0],
@@ -574,7 +587,7 @@ export default function AcademyApp({ cloudUser, signInPath, signOutPath }: { clo
                 setProgress={setProgress}
               />
             )}
-            {view === "path" && <Curriculum progress={progress} openModule={openModule} openReadiness={() => navigate("readiness")} />}
+            {view === "path" && <Curriculum progress={progress} openModule={openModule} openReadiness={() => navigate("readiness")} openFoundry={() => navigate("foundry")} />}
             {view === "module" && (
               <ModuleView
                 module={activeModule}
@@ -612,6 +625,7 @@ export default function AcademyApp({ cloudUser, signInPath, signOutPath }: { clo
               />
             )}
             {view === "drills" && <Drills progress={progress} setProgress={setProgress} />}
+            {view === "foundry" && <div className="page foundry-page"><EdgeFoundry value={progress.edgeFoundry} onChange={(edgeFoundry) => setProgress((current) => ({ ...current, edgeFoundry }))} /></div>}
             {view === "lab" && (
               <OperatorLab
                 tab={labTab}
@@ -676,7 +690,7 @@ function Dashboard({
         <div className="dashboard-intro-meta">
           <div><span>CORE CLEARANCE</span><strong>{curriculum.corePassed}<small> / {curriculum.coreTotal}</small></strong></div>
           <div><span>LESSON CLOCK</span><strong>{Math.floor(weekendLessonMinutes / 60)}<small>H</small>{String(weekendLessonMinutes % 60).padStart(2, "0")}</strong></div>
-          <button className="primary-action" onClick={() => curriculum.coreReady && !curriculum.vodLiterate ? navigate("readiness") : openModule(nextModule.id)}>{!curriculum.coreReady ? "Resume training" : !curriculum.vodLiterate ? "Prove readiness" : allComplete ? "Replay core" : "Enter bonus"}<span>→</span></button>
+          <button className="primary-action" onClick={() => !curriculum.coreReady ? openModule(nextModule.id) : !curriculum.vodLiterate ? navigate("readiness") : allComplete ? navigate("foundry") : openModule(nextModule.id)}>{!curriculum.coreReady ? "Resume training" : !curriculum.vodLiterate ? "Prove readiness" : allComplete ? "Forge my method" : "Enter bonus"}<span>→</span></button>
         </div>
       </header>
 
@@ -750,7 +764,7 @@ function Dashboard({
       </section>
 
       <section className="method-strip" aria-label="Method development loop">
-        <div><span>THE EDGE FACTORY</span><strong>Observation becomes automation only after it survives measurement.</strong></div>
+        <div><span>THE EDGE FACTORY</span><strong>Observation becomes automation only after it survives measurement.</strong><button onClick={() => navigate("foundry")}>Open Edge Foundry →</button></div>
         <ol>{["Observe", "Define", "Journal", "Test", "Alert", "Automate"].map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, "0")}</span>{step}</li>)}</ol>
       </section>
 
@@ -835,7 +849,7 @@ function Diagnostic({ progress, setProgress }: { progress: Progress; setProgress
   );
 }
 
-function Curriculum({ progress, openModule, openReadiness }: { progress: Progress; openModule: (id: string) => void; openReadiness: () => void }) {
+function Curriculum({ progress, openModule, openReadiness, openFoundry }: { progress: Progress; openModule: (id: string) => void; openReadiness: () => void; openFoundry: () => void }) {
   const curriculum = getCurriculumStats(progress);
   const renderModuleCards = (courseModules: Module[]) => (
     <div className="module-list">
@@ -890,6 +904,12 @@ function Curriculum({ progress, openModule, openReadiness }: { progress: Progres
       <section className="curriculum-phase bonus-phase">
         <div className="phase-divider"><span>Bonus Arsenal · Specialize after demonstrated literacy</span><i /></div>
         {renderModuleCards(bonusArsenalModules)}
+      </section>
+
+      <section className={`foundry-curriculum-card ${progress.edgeFoundry.completedAt ? "complete" : ""}`}>
+        <div><p className="eyebrow">FINAL LAB · BUILD YOUR OWN METHOD</p><h2>Turn observation into a falsifiable system.</h2><p>Specify the universe, state, evidence, trigger, risk, and exit. Then measure filter precision, missed winners, net expectancy, holdout performance, capacity, and the safe automation boundary.</p></div>
+        <div><span>{progress.edgeFoundry.completedAt ? "RESEARCH WORKFLOW" : "RECOMMENDED PREP"}</span><strong>{progress.edgeFoundry.completedAt ? "FOUNDRY READY" : "Modules 09–12"}</strong><small>{progress.edgeFoundry.completedAt ? "A method is specified and ready for honest paper testing." : "Open now; return as your evidence grows."}</small></div>
+        <button className="primary-action" onClick={openFoundry}>{progress.edgeFoundry.completedAt ? "Open my method" : "Enter Edge Foundry"} <span>→</span></button>
       </section>
     </div>
   );
@@ -1050,7 +1070,7 @@ function Drills({ progress, setProgress }: { progress: Progress; setProgress: Re
 function OperatorLab({ tab, setTab, progress, setProgress }: { tab: LabTab; setTab: (tab: LabTab) => void; progress: Progress; setProgress: React.Dispatch<React.SetStateAction<Progress>> }) {
   return (
     <div className="page lab-page">
-      <PageLead eyebrow="OPERATOR LAB" title="Calculate, read candles, replay, annotate." body="Use toy models to build intuition, six fictional candle simulations to read flow, timestamped history to fight hindsight, and a structured worksheet to extract decisions from public VODs." art={sectionArt.lab} />
+      <PageLead eyebrow="OPERATOR LAB" title="Find the rule. Try to break it." body="Build a falsifiable method, test filter trade-offs, calculate the economics, read flow, replay history, and extract point-in-time decisions from public VODs." art={sectionArt.lab} />
       <div className="lab-tabs">{(["calculators", "candles", "history", "vod"] as LabTab[]).map((item) => <button className={tab === item ? "active" : ""} onClick={() => setTab(item)} key={item}>{item === "calculators" ? "Math desk" : item === "candles" ? "Candle lab" : item === "history" ? "Historical tape" : "VOD notebook"}</button>)}</div>
       {tab === "calculators" && <Calculators />}
       {tab === "candles" && <CandleLab />}

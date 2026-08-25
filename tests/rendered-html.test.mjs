@@ -285,6 +285,70 @@ test("ships interactive candlestick literacy and evidence-translated trench lang
   }
 });
 
+test("ships a versioned Edge Foundry that teaches honest method discovery", async () => {
+  const [data, foundry, app, styles, readme] = await Promise.all([
+    readFile(new URL("../app/data/edge-foundry.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/EdgeFoundry.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/AcademyApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../README.md", import.meta.url), "utf8"),
+  ]);
+
+  const fieldBlock = data.slice(data.indexOf("export const edgeDraftFields"), data.indexOf("export const emptyEdgeDraft"));
+  assert.equal((fieldBlock.match(/^\s+\{ key:/gm) ?? []).length, 22, "the method grammar should retain all 22 explicit research fields");
+  for (const field of [
+    "causalHypothesis", "universe", "marketState", "disqualifiers", "trigger", "invalidation",
+    "latencyBudget", "outcomeLabel", "costModel", "baseline", "samplePlan", "holdoutRule",
+    "loggingSchema", "failureMode", "killCondition", "automationBoundary",
+  ]) assert.match(fieldBlock, new RegExp(`key: "${field}"`), `missing Foundry field: ${field}`);
+
+  const buildIds = [...data.matchAll(/id: "(B\d+)", split: "build"/g)].map((match) => match[1]);
+  const holdoutIds = [...data.matchAll(/id: "(H\d+)", split: "holdout"/g)].map((match) => match[1]);
+  assert.equal(buildIds.length, 9);
+  assert.equal(holdoutIds.length, 6);
+  assert.equal(new Set([...buildIds, ...holdoutIds]).size, 15, "build and holdout samples must be disjoint");
+  assert.match(data, /outcomeR: number \| null/);
+  assert.match(data, /observations\.slice\(-150\)/);
+  assert.match(data, /notes: clean\(item\.notes, 500\)/);
+  assert.match(data, /methodFingerprint\(draft\)/);
+  assert.match(data, /validation: Record<string, string>/);
+  assert.match(data, /filterConfig: FilterConfig/);
+  assert.match(data, /holdoutAttempt\?: \{ frozenConfig: FilterConfig; revealedAt: string \}/);
+  assert.match(data, /completedAt\?: string/);
+  assert.match(data, /baselineR/);
+  assert.match(data, /liftR/);
+  assert.match(data, /selected\.length \? winnersCaught \/ selected\.length : null/);
+
+  for (const stage of ["decode", "specify", "filter", "journal", "validate", "automate"]) {
+    assert.match(foundry, new RegExp(`id: "${stage}"`), `missing Foundry stage: ${stage}`);
+  }
+  assert.match(foundry, /IDENTITY LABEL/);
+  assert.match(foundry, /TRADE LABEL/);
+  assert.match(foundry, /30 MS/);
+  assert.match(foundry, /300 MS/);
+  assert.match(foundry, /THE SLOWER PATH WINS HERE/);
+  assert.match(foundry, /BASELINE EV/);
+  assert.match(foundry, /MISSED WINNERS/);
+  assert.match(foundry, /PAPER EVIDENCE REVIEW/);
+  assert.match(foundry, /READY TO TEST/);
+  assert.doesNotMatch(foundry, /AUTOMATION CANDIDATE|EDGE VALIDATED/);
+  assert.match(foundry, /outcomeR: null/);
+  assert.match(foundry, /item\.methodKey === currentMethodKey/);
+  assert.match(foundry, /FROZEN ATTEMPT/);
+  assert.match(foundry, /wash trading, fake traction, concealed multiwallet manipulation/);
+  assert.match(foundry, /Never paste a seed phrase here/);
+
+  assert.match(app, /view: "foundry", label: "Edge foundry", mark: "04"/);
+  assert.match(app, /hydrateEdgeFoundryState\(value\.edgeFoundry\)/);
+  assert.match(app, /mergeEdgeFoundryState\(remote\.edgeFoundry, local\.edgeFoundry\)/);
+  assert.match(app, /<EdgeFoundry value=\{progress\.edgeFoundry\}/);
+  assert.match(app, /foundry-curriculum-card/);
+  assert.match(styles, /\.foundry-shell/);
+  assert.match(styles, /\.dual-label-note/);
+  assert.match(styles, /\.latency-proof/);
+  assert.match(readme, /Edge Foundry/);
+});
+
 test("all source-library links are valid absolute URLs", async () => {
   const course = await readFile(new URL("../app/data/course.ts", import.meta.url), "utf8");
   const sourceBlock = course.slice(course.indexOf("export const sources"), course.indexOf("export const sourceMap"));
