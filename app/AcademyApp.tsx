@@ -433,11 +433,11 @@ function Dashboard({
     return courseModule ? progress.completed.includes(courseModule.id) : false;
   });
   const badges = [
-    { mark: "VL", label: "VOD literate", unlocked: curriculum.coreReady },
-    { mark: "MM", label: "Market mechanic", unlocked: hasPassed([1, 2, 3, 4]) },
-    { mark: "WC", label: "Wallet cartographer", unlocked: hasPassed([5, 6]) },
-    { mark: "RF", label: "Risk first", unlocked: hasPassed([8]) },
-    { mark: "TA", label: "Tape analyst", unlocked: hasPassed([7]) && progress.vodEntries.length >= 3 },
+    { mark: "VL", label: "VOD literate", image: "/achievements/vod-literate.png", unlocked: curriculum.coreReady },
+    { mark: "MM", label: "Market mechanic", image: "/achievements/market-mechanic.png", unlocked: hasPassed([1, 2, 3, 4]) },
+    { mark: "WC", label: "Wallet cartographer", image: "/achievements/wallet-cartographer.png", unlocked: hasPassed([5, 6]) },
+    { mark: "RF", label: "Risk first", image: "/achievements/risk-first.png", unlocked: hasPassed([8]) },
+    { mark: "TA", label: "Tape analyst", image: "/achievements/tape-analyst.png", unlocked: hasPassed([7]) && progress.vodEntries.length >= 3 },
   ];
 
   return (
@@ -530,7 +530,7 @@ function Dashboard({
 
         <div className="badge-rack">
           <div><span>ACHIEVEMENTS</span><strong>{badges.filter((badge) => badge.unlocked).length}/{badges.length} UNLOCKED</strong></div>
-          <ul>{badges.map((badge) => <li className={badge.unlocked ? "unlocked" : ""} key={badge.label} title={badge.label}><b>{badge.unlocked ? "✓" : badge.mark}</b><span>{badge.label}</span></li>)}</ul>
+          <ul>{badges.map((badge) => <li className={badge.unlocked ? "unlocked" : ""} key={badge.label} title={badge.label}><span className="badge-art" aria-hidden="true" style={{ backgroundImage: `url(${badge.image})` }}><b>{badge.mark}</b></span><span>{badge.label}</span></li>)}</ul>
         </div>
       </section>
 

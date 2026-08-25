@@ -607,10 +607,17 @@ a { color: inherit; }
 .rank-copy span, .rank-copy p { font-size: 10px; letter-spacing: .06em; }
 .rank-copy h2 { font-size: 23px; }
 .rank-track i::after { content: none; }
-.badge-rack { min-height: 146px; grid-column: auto; border: 0; border-radius: 0; box-shadow: none; }
+.badge-rack { min-height: 176px; grid-column: auto; grid-template-columns: 150px 1fr; border: 0; border-radius: 0; box-shadow: none; }
 .badge-rack > div span, .badge-rack > div strong { font-size: 10px; }
-.badge-rack li { min-height: 76px; border-radius: 5px; }
-.badge-rack li span { font-size: 10px; }
+.badge-rack li { min-height: 132px; flex-direction: column; justify-content: center; gap: 7px; padding: 9px 6px; border-radius: 6px; background: #0a0c0f; }
+.badge-rack li > span:last-child { width: 100%; min-height: 25px; display: grid; place-items: center; overflow: visible; color: #666c75; font: 500 10px/1.2 var(--font-sans); text-align: center; text-overflow: clip; white-space: normal; }
+.badge-art { width: 72px; height: 72px; position: relative; flex: 0 0 auto; display: block; overflow: visible !important; border: 0 !important; border-radius: 0 !important; background-repeat: no-repeat; background-position: center; background-size: contain; filter: grayscale(1) brightness(.56); opacity: .65; transition: filter .35s var(--ease-out), opacity .35s ease, transform .35s var(--ease-out); }
+.badge-art b { width: 21px !important; height: 21px !important; position: absolute; right: -1px; bottom: 1px; border: 1px solid #3a3f47 !important; border-radius: 4px !important; background: #111318; color: #7b818a; font: 500 8px var(--font-mono) !important; }
+.badge-rack li.unlocked { border-color: rgba(98,217,155,.22); background: linear-gradient(180deg, rgba(98,217,155,.035), rgba(255,255,255,.01)); }
+.badge-rack li.unlocked .badge-art { filter: none; opacity: 1; animation: badgeUnlock .52s var(--ease-out) both; }
+.badge-rack li.unlocked .badge-art b { display: none; }
+.badge-rack li.unlocked .badge-art::after { content: "✓"; width: 20px; height: 20px; position: absolute; right: 0; bottom: 1px; display: grid; place-items: center; border: 1px solid rgba(98,217,155,.5); border-radius: 50%; background: #0a1510; color: var(--green); font: 600 10px var(--font-mono); box-shadow: 0 0 18px rgba(98,217,155,.18); }
+.badge-rack li.unlocked > span:last-child { color: #b9c7bf; }
 .phase-preview, .diagnostic-section { margin-top: 64px; }
 .section-heading h2 { margin: 3px 0 0; font-size: clamp(30px,3vw,42px); font-weight: 600; letter-spacing: -.04em; }
 .section-heading button { color: #aeb3b9; font-size: 12px; }
@@ -776,6 +783,7 @@ a { color: inherit; }
 @keyframes detailEnter { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes candleReveal { from { opacity: 0; transform: scaleY(.25); } to { opacity: 1; transform: scaleY(1); } }
 @keyframes checkIn { from { opacity: 0; transform: scale(.65); } to { opacity: 1; transform: scale(1); } }
+@keyframes badgeUnlock { from { opacity: .35; transform: scale(.82) rotate(-3deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
 @keyframes livePulse { 50% { opacity: .35; } }
 
 @media (max-width: 1280px) {

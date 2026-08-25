@@ -100,3 +100,18 @@ test("all source-library links are valid absolute URLs", async () => {
     assert.match(parsed.protocol, /^https?:$/);
   }
 });
+
+test("ships optimized RGBA achievement artwork", async () => {
+  const names = ["vod-literate", "market-mechanic", "wallet-cartographer", "risk-first", "tape-analyst"];
+  const app = await readFile(new URL("../app/AcademyApp.tsx", import.meta.url), "utf8");
+
+  for (const name of names) {
+    assert.match(app, new RegExp(`/achievements/${name}\\.png`));
+    const png = await readFile(new URL(`../public/achievements/${name}.png`, import.meta.url));
+    assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+    assert.equal(png.readUInt32BE(16), 320);
+    assert.equal(png.readUInt32BE(20), 320);
+    assert.equal(png[25], 6, `${name} must use RGBA PNG color type`);
+    assert.ok(png.length < 200_000, `${name} should stay optimized for the achievement rack`);
+  }
+});
