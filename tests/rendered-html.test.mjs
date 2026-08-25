@@ -58,7 +58,8 @@ test("ships the complete course corpus without private screenshot material", asy
   const historyBlock = labs.slice(labs.indexOf("export const historicalCases"));
   assert.ok((historyBlock.match(/\n\s+id:\s"/g) ?? []).length >= 9);
 
-  assert.match(app, /localStorage\.setItem\("sol-academy-progress-v1"/);
+  assert.match(app, /const guestProgressKey = "sol-academy-progress-v1"/);
+  assert.match(app, /localStorage\.setItem\(storageKey/);
   assert.match(app, /function VodNotebook/);
   assert.match(app, /function Calculators/);
   assert.match(app, /function getOperatorStats/);
@@ -78,7 +79,8 @@ test("ships the complete course corpus without private screenshot material", asy
   assert.match(styles, /\.module-list/);
   assert.match(styles, /\.reference-workspace/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
-  assert.match(page, /<AcademyApp \/>/);
+  assert.match(page, /cloudUser=\{user \?/);
+  assert.match(page, /signInPath=\{chatGPTSignInPath\("\/"\)\}/);
   assert.match(layout, /Sol Academy/);
   assert.match(layout, /Instrument_Sans/);
   assert.match(layout, /IBM_Plex_Mono/);
@@ -88,6 +90,43 @@ test("ships the complete course corpus without private screenshot material", asy
   assert.doesNotMatch(publicSurface, /codex-clipboard|AppData\\Local\\Temp/);
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
   await assert.rejects(access(new URL("../app/_sites-preview/preview.css", import.meta.url)));
+});
+
+test("ships isolated ChatGPT cloud progress with a resilient local fallback", async () => {
+  const [hostingText, auth, route, schema, migration, app, readme] = await Promise.all([
+    readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
+    readFile(new URL("../app/chatgpt-auth.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/progress/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0000_silky_meltdown.sql", import.meta.url), "utf8"),
+    readFile(new URL("../app/AcademyApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../README.md", import.meta.url), "utf8"),
+  ]);
+
+  assert.equal(JSON.parse(hostingText).d1, "DB");
+  assert.match(auth, /oai-authenticated-user-id/);
+  assert.match(auth, /oai-authenticated-user-email/);
+  assert.match(auth, /\/signin-with-chatgpt/);
+  assert.match(auth, /\/signout-with-chatgpt/);
+
+  assert.match(schema, /userId: text\("user_id"\)\.primaryKey\(\)/);
+  assert.equal((migration.match(/CREATE TABLE/g) ?? []).length, 1);
+  assert.match(migration, /`user_id` text PRIMARY KEY NOT NULL/);
+  assert.match(migration, /`revision` integer DEFAULT 1 NOT NULL/);
+
+  assert.match(route, /if \(!user\).*status: 401/);
+  assert.match(route, /WHERE user_id = \?1/);
+  assert.match(route, /WHERE user_id = \?2 AND revision = \?3/);
+  assert.match(route, /status: 409/);
+  assert.match(route, /maxProgressBytes = 240_000/);
+
+  assert.match(app, /function mergeProgress/);
+  assert.match(app, /`\$\{guestProgressKey\}:\$\{cloudUser\.userId\}`/);
+  assert.match(app, /window\.localStorage\.removeItem\(guestProgressKey\)/);
+  assert.match(app, /Saved across devices/);
+  assert.match(app, /Sign in to sync/);
+  assert.match(readme, /does not require Firebase, Supabase/);
+
 });
 
 test("ships the Day 3 performance curriculum and evidence rubric", async () => {

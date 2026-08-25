@@ -25,7 +25,7 @@ The product includes:
 - historical studies covering the late-2023 through early-2025 Solana cycle and newer 2026 evidence
 - a research-backed trench-language layer throughout every module, with public Reddit/X usage translated into observable evidence and explicit “does not prove” warnings
 - a searchable glossary covering candle mechanics and current phrases such as trenching, clicking, PvP, prebond, fullclip, dev out, deriv, vamp, god candle, roundtrip, and top-blast
-- local progress and VOD notes with JSON export
+- optional ChatGPT sign-in for private cloud progress across devices, with local fallback and JSON export
 - an evidence library linking claims to primary documentation, on-chain research, and clearly labeled secondary reporting
 - a commissioned 32-piece editorial image system for modules, drills, history cases, and major workspaces; see [the art direction](docs/art-direction.md)
 
@@ -40,7 +40,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Progress and notebook entries stay in your browser's local storage. The app does not connect to a wallet, request a seed phrase, execute trades, or send your study data to a server.
+You can use the academy without signing in; anonymous progress and notebook entries stay in that browser's local storage. Sign in with ChatGPT to sync a separate private profile across your phone and computers. Existing browser progress merges into your profile the first time you sign in, and a local copy remains available if the network drops.
+
+The app does not connect to a wallet, request a seed phrase, or execute trades. Cloud sync stores only your academy progress and notebook data in the site's built-in database; it does not require Firebase, Supabase, an API key, or another account.
 
 ## Verify the release
 

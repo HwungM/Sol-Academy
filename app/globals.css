@@ -1811,6 +1811,20 @@ a { color: inherit; }
 .topbar-status { color: #838991; font: 500 10px var(--font-mono); letter-spacing: .05em; }
 .topbar-status i { width: 5px; height: 5px; box-shadow: none; animation: livePulse 2.4s ease-in-out infinite; }
 .topbar-status b { color: #555b64; font-size: 10px; }
+.topbar-status a { margin-left: 2px; padding: 4px 7px; border: 1px solid var(--line-bright); border-radius: 3px; color: #aeb4bb; font: 500 9px var(--font-mono); text-decoration: none; white-space: nowrap; }
+.topbar-status a:hover { border-color: rgba(185,244,95,.45); color: var(--lime); }
+.topbar-status.sync-loading i, .topbar-status.sync-syncing i, .sidebar-account.sync-loading i, .sidebar-account.sync-syncing i { background: var(--cyan); animation: livePulse 1.2s ease-in-out infinite; }
+.topbar-status.sync-offline i, .sidebar-account.sync-offline i { background: var(--amber); }
+
+.sidebar-account { display: grid; gap: 11px; margin: 14px 10px 2px; padding: 13px 0; border-top: 1px solid var(--line); }
+.sidebar-account > div { min-width: 0; display: grid; gap: 4px; }
+.sidebar-account span { display: flex; align-items: center; gap: 7px; color: #676e78; font: 500 8px var(--font-mono); letter-spacing: .06em; }
+.sidebar-account span i { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+.sidebar-account strong { overflow: hidden; color: #b7bcc2; font-size: 11px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-account small { overflow: hidden; color: #626972; font: 400 9px/1.35 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-account > a { min-height: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 9px; border: 1px solid #2b3138; border-radius: 4px; color: #9299a2; background: #0c0f12; font-size: 10px; text-decoration: none; }
+.sidebar-account > a:hover { border-color: rgba(185,244,95,.38); color: var(--paper); }
+.sidebar-account > a b { color: var(--lime); font: 500 11px var(--font-mono); }
 .topbar-rank { gap: 7px; font: 500 10px var(--font-mono); letter-spacing: .03em; }
 .topbar-rank span { padding: 3px 5px; border-color: var(--line-bright); border-radius: 3px; color: #aaa1ec; }
 .topbar-rank strong { color: #a6abb3; font-weight: 500; }

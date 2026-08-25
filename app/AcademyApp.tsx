@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   diagnosticQuestions,
   modules,
@@ -21,6 +21,13 @@ import { TrenchDecoder } from "./TrenchDecoder";
 
 type View = "dashboard" | "path" | "module" | "readiness" | "drills" | "lab" | "glossary" | "sources";
 type LabTab = "calculators" | "candles" | "history" | "vod";
+type SyncState = "local" | "loading" | "syncing" | "synced" | "offline";
+
+type CloudUser = {
+  userId: string;
+  displayName: string;
+  email: string;
+};
 
 type VodEntry = {
   id: string;
@@ -220,6 +227,35 @@ function hydrateProgress(value: unknown): Progress {
   };
 }
 
+function mergeProgress(remote: Progress, local: Progress): Progress {
+  const scores = { ...remote.scores };
+  Object.entries(local.scores).forEach(([moduleId, score]) => {
+    scores[moduleId] = Math.max(scores[moduleId] ?? 0, score);
+  });
+
+  const readinessExamDomains = { ...remote.readinessExamDomains };
+  Object.entries(local.readinessExamDomains).forEach(([domain, score]) => {
+    readinessExamDomains[domain] = Math.max(readinessExamDomains[domain] ?? 0, score);
+  });
+
+  const vodEntries = new Map(remote.vodEntries.map((entry) => [entry.id, entry]));
+  local.vodEntries.forEach((entry) => vodEntries.set(entry.id, entry));
+  const passedDates = [remote.readinessPassedAt, local.readinessPassedAt].filter((value): value is string => Boolean(value)).sort();
+
+  return hydrateProgress({
+    completed: Array.from(new Set([...remote.completed, ...local.completed])),
+    scores,
+    notes: { ...remote.notes, ...local.notes },
+    drillAnswers: { ...remote.drillAnswers, ...local.drillAnswers },
+    vodEntries: Array.from(vodEntries.values()),
+    readinessPractice: { ...remote.readinessPractice, ...local.readinessPractice },
+    readinessExamDomains,
+    diagnosticScore: Math.max(remote.diagnosticScore ?? 0, local.diagnosticScore ?? 0) || undefined,
+    readinessExamBest: Math.max(remote.readinessExamBest ?? 0, local.readinessExamBest ?? 0) || undefined,
+    readinessPassedAt: passedDates[0],
+  });
+}
+
 function getOperatorStats(progress: Progress): OperatorStats {
   const answeredDrills = drills.filter((drill) => progress.drillAnswers[drill.id] !== undefined).length;
   const correctDrills = drills.filter((drill) => progress.drillAnswers[drill.id] === drill.answer).length;
@@ -268,18 +304,33 @@ function getCurriculumStats(progress: Progress): CurriculumStats {
   };
 }
 
-function useCourseProgress() {
+const guestProgressKey = "sol-academy-progress-v1";
+
+function useCourseProgress(cloudUser: CloudUser | null) {
   const [progress, setProgress] = useState<Progress>(emptyProgress);
   const [hydrated, setHydrated] = useState(false);
+  const [cloudReady, setCloudReady] = useState(false);
+  const [syncState, setSyncState] = useState<SyncState>(cloudUser ? "loading" : "local");
+  const progressRef = useRef(progress);
+  const revisionRef = useRef(0);
+  const storageKey = cloudUser ? `${guestProgressKey}:${cloudUser.userId}` : guestProgressKey;
+
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       try {
-        const saved = window.localStorage.getItem("sol-academy-progress-v1");
-        if (saved) {
-          setProgress(hydrateProgress(JSON.parse(saved)));
-        }
+        const guestSaved = window.localStorage.getItem(guestProgressKey);
+        const accountSaved = window.localStorage.getItem(storageKey);
+        const guestProgress = guestSaved ? hydrateProgress(JSON.parse(guestSaved)) : emptyProgress;
+        const accountProgress = accountSaved ? hydrateProgress(JSON.parse(accountSaved)) : emptyProgress;
+        const restored = cloudUser ? mergeProgress(guestProgress, accountProgress) : guestProgress;
+        progressRef.current = restored;
+        setProgress(restored);
       } catch {
+        progressRef.current = emptyProgress;
         setProgress(emptyProgress);
       } finally {
         setHydrated(true);
@@ -287,22 +338,97 @@ function useCourseProgress() {
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, []);
+  }, [cloudUser, storageKey]);
 
   useEffect(() => {
     if (!hydrated) return;
     try {
-      window.localStorage.setItem("sol-academy-progress-v1", JSON.stringify(progress));
+      window.localStorage.setItem(storageKey, JSON.stringify(progress));
     } catch {
       // The academy still works in memory when browser storage is unavailable or full.
     }
-  }, [hydrated, progress]);
+  }, [hydrated, progress, storageKey]);
 
-  return { progress, setProgress, hydrated };
+  useEffect(() => {
+    if (!hydrated || !cloudUser) return;
+
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch("/api/progress", { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("Cloud progress unavailable");
+        const payload = await response.json() as { progress: unknown; revision: number };
+        const merged = mergeProgress(hydrateProgress(payload.progress), progressRef.current);
+        revisionRef.current = Number.isInteger(payload.revision) ? payload.revision : 0;
+        progressRef.current = merged;
+        try {
+          window.localStorage.setItem(storageKey, JSON.stringify(merged));
+          if (storageKey !== guestProgressKey) window.localStorage.removeItem(guestProgressKey);
+        } catch {
+          // Cloud remains authoritative when local storage is unavailable.
+        }
+        setProgress(merged);
+        setCloudReady(true);
+        setSyncState("syncing");
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setSyncState("offline");
+      }
+    })();
+
+    return () => controller.abort();
+  }, [cloudUser, hydrated, storageKey]);
+
+  useEffect(() => {
+    if (!hydrated || !cloudReady || !cloudUser) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setSyncState("syncing");
+        let snapshot = progress;
+        try {
+          for (let attempt = 0; attempt < 2; attempt += 1) {
+            const response = await fetch("/api/progress", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ progress: snapshot, baseRevision: revisionRef.current }),
+              signal: controller.signal,
+            });
+            const payload = await response.json() as { progress?: unknown; revision?: number };
+
+            if (response.status === 409 && payload.progress && Number.isInteger(payload.revision)) {
+              revisionRef.current = payload.revision as number;
+              const merged = mergeProgress(hydrateProgress(payload.progress), progressRef.current);
+              if (JSON.stringify(merged) !== JSON.stringify(progressRef.current)) {
+                progressRef.current = merged;
+                setProgress(merged);
+              }
+              snapshot = merged;
+              continue;
+            }
+            if (!response.ok || !Number.isInteger(payload.revision)) throw new Error("Cloud save failed");
+            revisionRef.current = payload.revision as number;
+            setSyncState("synced");
+            return;
+          }
+          throw new Error("Cloud save conflict");
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          setSyncState("offline");
+        }
+      })();
+    }, 850);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [cloudReady, cloudUser, hydrated, progress]);
+
+  return { progress, setProgress, hydrated, syncState };
 }
 
-export default function AcademyApp() {
-  const { progress, setProgress, hydrated } = useCourseProgress();
+export default function AcademyApp({ cloudUser, signInPath, signOutPath }: { cloudUser: CloudUser | null; signInPath: string; signOutPath: string }) {
+  const { progress, setProgress, hydrated, syncState } = useCourseProgress(cloudUser);
   const [view, setView] = useState<View>("dashboard");
   const [activeModuleId, setActiveModuleId] = useState(modules[0].id);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -358,6 +484,7 @@ export default function AcademyApp() {
   const currentViewLabel = view === "module"
     ? `Module ${String(activeModule.number).padStart(2, "0")} · ${activeModule.shortTitle}`
     : navItems.find((item) => item.view === view)?.label ?? "Command center";
+  const syncCopy = syncState === "loading" ? "Connecting…" : syncState === "syncing" ? "Saving…" : syncState === "synced" ? "Saved across devices" : syncState === "offline" ? "Local copy · retry next visit" : "Progress stays on this device";
 
   return (
     <div className="academy-shell">
@@ -400,6 +527,11 @@ export default function AcademyApp() {
           </div>
         </nav>
 
+        <div className={`sidebar-account sync-${syncState}`}>
+          <div><span><i />{cloudUser ? "CLOUD PROFILE" : "DEVICE PROFILE"}</span><strong>{cloudUser?.displayName ?? "Not signed in"}</strong><small>{syncCopy}</small></div>
+          <a href={cloudUser ? signOutPath : signInPath}>{cloudUser ? "Sign out" : "Sign in to sync"}<b>→</b></a>
+        </div>
+
         <div className="sidebar-progress">
           <div className="progress-ring" role="progressbar" aria-label="VOD readiness" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completion)} style={{ "--progress": `${completion * 3.6}deg` } as React.CSSProperties}>
             <span>{Math.round(completion)}%</span>
@@ -421,7 +553,7 @@ export default function AcademyApp() {
           <button className="mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation" aria-controls="academy-navigation" aria-expanded={mobileOpen}>MENU</button>
           <div className="topbar-breadcrumb"><span>SOL ACADEMY</span><b>/</b><strong>{currentViewLabel}</strong></div>
           <button className="topbar-search" onClick={() => navigate("glossary")}><span>Search field glossary</span><kbd>G</kbd></button>
-          <div className="topbar-status"><i /> <span>LOCAL</span><b>Progress stays on this device</b></div>
+          <div className={`topbar-status sync-${syncState}`} title={cloudUser?.email ?? "Device-only progress"}><i /> <span>{cloudUser ? "CLOUD" : "LOCAL"}</span><b>{syncCopy}</b><a href={cloudUser ? signOutPath : signInPath}>{cloudUser ? "Sign out" : "Sign in to sync"}</a></div>
           <div className="topbar-rank"><span>{operatorStats.rank.code}</span><strong>{operatorStats.rank.name}</strong><b>{operatorStats.xp} XP</b></div>
         </header>
 
