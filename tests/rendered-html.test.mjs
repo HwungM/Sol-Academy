@@ -90,6 +90,114 @@ test("ships the complete course corpus without private screenshot material", asy
   await assert.rejects(access(new URL("../app/_sites-preview/preview.css", import.meta.url)));
 });
 
+test("ships the Day 3 performance curriculum and evidence rubric", async () => {
+  const [readiness, readinessLab, replay, rubric, app] = await Promise.all([
+    readFile(new URL("../app/data/readiness.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/ReadinessLab.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/ProgressiveReplay.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/data/vod-rubric.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/AcademyApp.tsx", import.meta.url), "utf8"),
+  ]);
+
+  const expectedDomains = ["Screen", "Math", "Wallets", "Narrative", "Tape", "Risk", "Execution", "VOD"];
+  const domainDeclaration = readiness.match(/export const readinessDomains\s*=\s*\[([^\]]+)]\s*as const/);
+  assert.ok(domainDeclaration, "the readiness-domain declaration should remain machine-checkable");
+  const declaredDomains = [...domainDeclaration[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(declaredDomains, expectedDomains);
+
+  const practiceStart = readiness.indexOf("export const practiceScenarios");
+  const examStart = readiness.indexOf("export const examScenarios");
+  assert.ok(practiceStart >= 0 && examStart > practiceStart, "both readiness banks should be exported");
+
+  const parseScenarios = (source) =>
+    [...source.matchAll(/scenario\(\s*"([^"]+)",\s*"([^"]+)"/g)].map(([, id, domain]) => ({ id, domain }));
+  const practice = parseScenarios(readiness.slice(practiceStart, examStart));
+  const exam = parseScenarios(readiness.slice(examStart));
+
+  for (const [label, bank] of [["practice", practice], ["exam", exam]]) {
+    assert.equal(bank.length, 16, `the ${label} bank should contain exactly 16 scenarios`);
+    assert.equal(new Set(bank.map(({ id }) => id)).size, 16, `${label} scenario ids must be unique`);
+    for (const domain of expectedDomains) {
+      assert.equal(
+        bank.filter((scenario) => scenario.domain === domain).length,
+        2,
+        `the ${label} bank should contain exactly two ${domain} scenarios`,
+      );
+    }
+  }
+  assert.equal(
+    practice.filter(({ id }) => exam.some((scenario) => scenario.id === id)).length,
+    0,
+    "the unseen exam must not reuse practice scenario ids",
+  );
+
+  const actionDeclaration = replay.match(/const replayActions\s*=\s*\[([^\]]+)]\s*as const/);
+  assert.ok(actionDeclaration, "progressive replay actions should remain explicit");
+  assert.deepEqual(
+    [...actionDeclaration[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]),
+    ["Skip", "Watch", "Paper entry", "Add", "Trim", "Exit"],
+  );
+  assert.match(replay, /minimumRationaleLength\s*=\s*12/);
+  assert.match(replay, /completedCheckpoints\s*\+\s*1/);
+  assert.match(replay, /Evidence review unlocked/);
+
+  assert.match(readinessLab, /const allAnswered = answeredCount === examScenarios\.length/);
+  assert.match(readinessLab, /readinessDomains\.every\(\(domain\) => domainScores\[domain\] >= 50\)/);
+  assert.match(readinessLab, /\.filter\(\(scenario\) => scenario\.criticalError\)/);
+  assert.match(
+    readinessLab,
+    /passed: score >= 85 && domainFloorClear && criticalClear/,
+    "passing must require the score target, the per-domain floor, and a clean critical set",
+  );
+
+  const dimensionStart = rubric.indexOf("export const vodAnnotationRubric");
+  const criticalErrorStart = rubric.indexOf("export const vodCriticalErrorRules");
+  assert.ok(dimensionStart >= 0 && criticalErrorStart > dimensionStart, "the VOD rubric should be exported");
+  const dimensionIds = [...rubric.slice(dimensionStart, criticalErrorStart).matchAll(/\bid:\s*"([^"]+)"/g)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(dimensionIds, [
+    "traceability",
+    "state",
+    "action",
+    "evidence",
+    "thesis",
+    "trigger",
+    "risk",
+    "counterfactual",
+  ]);
+
+  const fieldDeclaration = rubric.match(/export type VodAnnotationField\s*=([\s\S]*?);/);
+  assert.ok(fieldDeclaration, "structured VOD annotation fields should remain explicit");
+  assert.deepEqual(
+    [...fieldDeclaration[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]),
+    [
+      "url",
+      "timestamp",
+      "platform",
+      "tokenState",
+      "action",
+      "observation",
+      "evidenceGrade",
+      "thesis",
+      "trigger",
+      "sizeRisk",
+      "invalidation",
+      "exitPlan",
+      "skippedAlternative",
+    ],
+  );
+  assert.match(rubric, /percent >= 88/);
+
+  assert.match(app, /view: "readiness", label: "Day 3 readiness"/);
+  assert.match(app, /const examCleared = Boolean\(progress\.readinessPassedAt\)/);
+  assert.match(app, /scoreVodAnnotationCompleteness\(entry\)\.percent >= 88/);
+  assert.match(app, /const vodLiterate = coreReady && examCleared && qualityVodNotes >= 2/);
+  assert.match(app, /SCREEN ORIENTED/);
+  assert.match(app, /VOD LITERATE/);
+  assert.match(app, /Math\.min\(\(progress\.readinessExamBest \?\? 0\) \/ 85, 1\)/);
+});
+
 test("all source-library links are valid absolute URLs", async () => {
   const course = await readFile(new URL("../app/data/course.ts", import.meta.url), "utf8");
   const sourceBlock = course.slice(course.indexOf("export const sources"), course.indexOf("export const sourceMap"));

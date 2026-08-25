@@ -1,22 +1,28 @@
 # Sol Academy
 
-An interactive, evidence-backed course for learning how Solana memecoin markets actually work before trying to extract strategy from fast-moving trading VODs.
+An interactive, evidence-backed course for learning how Solana memecoin markets work before trying to extract a repeatable process from fast-moving trading VODs.
 
-The academy now has two clear layers:
+The academy has a three-day orientation and proof path, followed by optional depth:
 
-- **2-Day Core Path:** Modules 01–08 contain 7h35 of lesson material, or roughly 9–10 focused hours with checks and breaks. Complete Day 1 and Day 2 whenever they fit your schedule; this is the minimum path to understanding a fast memecoin VOD.
-- **Bonus Arsenal:** Modules 09–12 add setup families, execution internals, automation architecture, historical replay, and a full VOD capstone.
+- **Day 1 — Market orientation:** Modules 01–04 cover the game map, money math, token lifecycle, and terminal literacy.
+- **Day 2 — Decision orientation:** Modules 05–08 cover wallet evidence, narratives, tape reading, and risk. Together, Days 1 and 2 contain 7h35 of lesson material, or roughly 9–10 focused hours with checks and breaks.
+- **Day 3 — Performance gate:** A 90–120 minute lab translates concepts across terminals, provides 16 guided practice scenarios, and ends with 16 different exam scenarios. Passing requires at least 85% overall, no domain below 50%, every critical-error scenario correct, and two VOD annotations scoring at least 88% for completeness.
+- **Bonus Arsenal:** Modules 09–12 deepen setup families, execution internals, automation architecture, historical replay, and VOD study after the core performance proof.
 
 The product includes:
 
-- 12 sequenced modules split into the 2-Day Core Path and optional Bonus Arsenal
-- 48 graded questions plus an entry diagnostic
+- 12 sequenced modules split into Day 1, Day 2, and the optional Bonus Arsenal
+- a Day 3 terminal lab with 16 practice and 16 unseen exam scenarios—exactly two per Screen, Math, Wallets, Narrative, Tape, Risk, Execution, and VOD domain
+- 48 module questions plus an entry diagnostic
 - decision drills built around incomplete, adversarial market data
+- progressive historical replays that reveal one checkpoint only after the learner locks a Skip, Watch, Paper entry, Add, Trim, or Exit decision with a rationale
+- a structured VOD notebook scored across eight dimensions, with evidence grades and explicit fields for state, trigger, size/risk, invalidation, exit plan, and the skipped alternative
+- cross-platform translation between terminal labels and the underlying operator questions
 - learning-based XP, six operator ranks, missions, and mastery achievements
 - market-cap, liquidity, price-impact, position-sizing, and expectancy calculators
-- historical tape studies covering the late-2023 through early-2025 Solana cycle and newer 2026 evidence
+- historical studies covering the late-2023 through early-2025 Solana cycle and newer 2026 evidence
 - a searchable trench-language glossary
-- a local VOD observation notebook with JSON export
+- local progress and VOD notes with JSON export
 - an evidence library linking claims to primary documentation, on-chain research, and clearly labeled secondary reporting
 - a commissioned 32-piece editorial image system for modules, drills, history cases, and major workspaces; see [the art direction](docs/art-direction.md)
 
@@ -39,17 +45,20 @@ Progress and notebook entries stay in your browser's local storage. The app does
 npm test
 ```
 
-The test command creates a production build, checks the rendered product shell, verifies the complete course corpus, rejects private screenshot identifiers, validates every evidence-library URL, and confirms that all mapped editorial assets and social metadata ship correctly.
+The test command creates a production build, checks the rendered product shell, verifies the course corpus and Day 3 scenario balance, enforces the replay action set and VOD annotation contract, rejects private screenshot identifiers, validates every evidence-library URL, and confirms that all mapped editorial assets and social metadata ship correctly.
 
 ## Learning model
 
 The curriculum follows a strict progression:
 
-1. Read the market and token lifecycle.
+1. Learn enough mechanics and terminal vocabulary to orient yourself on a fast screen.
 2. Interpret wallets, holders, developers, snipers, and launch structure without overclaiming identity.
-3. Read attention, momentum, liquidity, and execution quality.
-4. Build a repeatable observation and review process.
-5. Quantify a manual edge before considering automation.
+3. Read attention, momentum, liquidity, execution quality, and risk from incomplete evidence.
+4. Transfer those concepts to unfamiliar screens and unseen scenarios in the Day 3 performance gate.
+5. Reconstruct real VOD decisions without hindsight leakage or invented evidence.
+6. Use progressive replay and a journal to form, test, and quantify a manual setup before considering automation.
+
+Completing Modules 01–08 earns **Screen Oriented** status. **VOD Literate** is reserved for learners who also clear the Day 3 exam and submit two complete VOD annotations. The labels measure course performance, not profitability or readiness to risk money.
 
 The material distinguishes facts visible on-chain from vendor labels and trader inferences. Historical winners are used to teach decision-making and failure modes, not as hindsight promises.
 

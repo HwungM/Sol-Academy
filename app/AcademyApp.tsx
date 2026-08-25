@@ -13,18 +13,27 @@ import {
 } from "./data/course";
 import { drills, glossary, historicalCases } from "./data/labs";
 import { drillArt, historyArt, moduleArt, sectionArt, type ArtAsset } from "./data/art";
+import { evidenceGrades, scoreVodAnnotationCompleteness } from "./data/vod-rubric";
+import { ProgressiveReplay } from "./ProgressiveReplay";
+import { ReadinessLab, type ReadinessExamResult } from "./ReadinessLab";
 
-type View = "dashboard" | "path" | "module" | "drills" | "lab" | "glossary" | "sources";
+type View = "dashboard" | "path" | "module" | "readiness" | "drills" | "lab" | "glossary" | "sources";
 type LabTab = "calculators" | "history" | "vod";
 
 type VodEntry = {
   id: string;
   url: string;
   timestamp: string;
+  platform: string;
+  tokenState: string;
   action: string;
   observation: string;
   thesis: string;
+  trigger: string;
+  sizeRisk: string;
   invalidation: string;
+  exitPlan: string;
+  skippedAlternative: string;
   evidenceGrade: string;
 };
 
@@ -35,6 +44,10 @@ type Progress = {
   diagnosticScore?: number;
   drillAnswers: Record<string, number>;
   vodEntries: VodEntry[];
+  readinessPractice: Record<string, number>;
+  readinessExamBest?: number;
+  readinessExamDomains: Record<string, number>;
+  readinessPassedAt?: string;
 };
 
 type OperatorRank = {
@@ -57,6 +70,9 @@ type CurriculumStats = {
   coreTotal: number;
   corePct: number;
   coreReady: boolean;
+  qualityVodNotes: number;
+  vodLiterate: boolean;
+  readinessPct: number;
   bonusPassed: number;
   bonusTotal: number;
   nextCore?: Module;
@@ -69,15 +85,18 @@ const emptyProgress: Progress = {
   notes: {},
   drillAnswers: {},
   vodEntries: [],
+  readinessPractice: {},
+  readinessExamDomains: {},
 };
 
 const navItems: { view: View; label: string; mark: string }[] = [
   { view: "dashboard", label: "Command center", mark: "01" },
   { view: "path", label: "Curriculum", mark: "02" },
-  { view: "drills", label: "Decision drills", mark: "03" },
-  { view: "lab", label: "Operator lab", mark: "04" },
-  { view: "glossary", label: "Field glossary", mark: "05" },
-  { view: "sources", label: "Evidence library", mark: "06" },
+  { view: "readiness", label: "Day 3 readiness", mark: "03" },
+  { view: "drills", label: "Decision drills", mark: "04" },
+  { view: "lab", label: "Operator lab", mark: "05" },
+  { view: "glossary", label: "Field glossary", mark: "06" },
+  { view: "sources", label: "Evidence library", mark: "07" },
 ];
 
 const operatorRanks: OperatorRank[] = [
@@ -133,6 +152,20 @@ function hydrateProgress(value: unknown): Progress {
     });
   }
 
+  const readinessPractice: Record<string, number> = {};
+  if (isRecord(value.readinessPractice)) {
+    Object.entries(value.readinessPractice).forEach(([scenarioId, answer]) => {
+      if (typeof answer === "number" && Number.isInteger(answer) && answer >= 0 && answer < 4) readinessPractice[scenarioId] = answer;
+    });
+  }
+
+  const readinessExamDomains: Record<string, number> = {};
+  if (isRecord(value.readinessExamDomains)) {
+    Object.entries(value.readinessExamDomains).forEach(([domain, score]) => {
+      if (typeof score === "number" && Number.isFinite(score)) readinessExamDomains[domain] = Math.max(0, Math.min(100, score));
+    });
+  }
+
   const vodEntries: VodEntry[] = Array.isArray(value.vodEntries)
     ? value.vodEntries.flatMap((item) => {
         if (!isRecord(item)) return [];
@@ -142,10 +175,16 @@ function hydrateProgress(value: unknown): Progress {
           id: item.id as string,
           url: item.url as string,
           timestamp: item.timestamp as string,
+          platform: typeof item.platform === "string" ? item.platform : "",
+          tokenState: typeof item.tokenState === "string" ? item.tokenState : "",
           action: item.action as string,
           observation: item.observation as string,
           thesis: item.thesis as string,
+          trigger: typeof item.trigger === "string" ? item.trigger : "",
+          sizeRisk: typeof item.sizeRisk === "string" ? item.sizeRisk : "",
           invalidation: item.invalidation as string,
+          exitPlan: typeof item.exitPlan === "string" ? item.exitPlan : "",
+          skippedAlternative: typeof item.skippedAlternative === "string" ? item.skippedAlternative : "",
           evidenceGrade: item.evidenceGrade as string,
         }];
       })
@@ -158,6 +197,12 @@ function hydrateProgress(value: unknown): Progress {
   const diagnosticScore = typeof value.diagnosticScore === "number" && Number.isFinite(value.diagnosticScore)
     ? Math.max(0, Math.min(100, value.diagnosticScore))
     : undefined;
+  const readinessExamBest = typeof value.readinessExamBest === "number" && Number.isFinite(value.readinessExamBest)
+    ? Math.max(0, Math.min(100, value.readinessExamBest))
+    : undefined;
+  const readinessPassedAt = typeof value.readinessPassedAt === "string" && value.readinessPassedAt
+    ? value.readinessPassedAt
+    : undefined;
 
   return {
     completed: Array.from(new Set([...completed, ...passedFromScores])),
@@ -165,7 +210,11 @@ function hydrateProgress(value: unknown): Progress {
     notes,
     drillAnswers,
     vodEntries,
+    readinessPractice,
+    readinessExamDomains,
     ...(diagnosticScore !== undefined ? { diagnosticScore } : {}),
+    ...(readinessExamBest !== undefined ? { readinessExamBest } : {}),
+    ...(readinessPassedAt !== undefined ? { readinessPassedAt } : {}),
   };
 }
 
@@ -177,7 +226,8 @@ function getOperatorStats(progress: Progress): OperatorStats {
     answeredDrills * 10 +
     correctDrills * 40 +
     (progress.diagnosticScore !== undefined ? 50 : 0) +
-    Math.min(progress.vodEntries.length, 8) * 75;
+    Math.min(progress.vodEntries.length, 8) * 75 +
+    (progress.readinessPassedAt ? 300 : 0);
   const rankIndex = operatorRanks.findLastIndex((rank) => xp >= rank.min);
   const rank = operatorRanks[Math.max(rankIndex, 0)];
   const nextRank = operatorRanks[rankIndex + 1];
@@ -191,11 +241,24 @@ function getOperatorStats(progress: Progress): OperatorStats {
 function getCurriculumStats(progress: Progress): CurriculumStats {
   const corePassed = weekendCoreModules.filter((module) => progress.completed.includes(module.id)).length;
   const bonusPassed = bonusArsenalModules.filter((module) => progress.completed.includes(module.id)).length;
+  const corePct = (corePassed / weekendCoreModules.length) * 100;
+  const coreReady = corePassed === weekendCoreModules.length;
+  const qualityVodNotes = progress.vodEntries.filter((entry) => scoreVodAnnotationCompleteness(entry).percent >= 88).length;
+  const examCleared = Boolean(progress.readinessPassedAt);
+  const vodLiterate = coreReady && examCleared && qualityVodNotes >= 2;
+  const readinessPct = Math.min(100,
+    corePct * 0.6 +
+    Math.min((progress.readinessExamBest ?? 0) / 85, 1) * 25 +
+    Math.min(qualityVodNotes / 2, 1) * 15,
+  );
   return {
     corePassed,
     coreTotal: weekendCoreModules.length,
-    corePct: (corePassed / weekendCoreModules.length) * 100,
-    coreReady: corePassed === weekendCoreModules.length,
+    corePct,
+    coreReady,
+    qualityVodNotes,
+    vodLiterate,
+    readinessPct,
     bonusPassed,
     bonusTotal: bonusArsenalModules.length,
     nextCore: weekendCoreModules.find((module) => !progress.completed.includes(module.id)),
@@ -257,7 +320,7 @@ export default function AcademyApp() {
   }, []);
 
   const curriculumStats = useMemo(() => getCurriculumStats(progress), [progress]);
-  const completion = curriculumStats.corePct;
+  const completion = curriculumStats.readinessPct;
   const operatorStats = useMemo(() => getOperatorStats(progress), [progress]);
   const activeModule = modules.find((item) => item.id === activeModuleId) ?? modules[0];
 
@@ -309,7 +372,7 @@ export default function AcademyApp() {
         <nav className="side-nav" aria-label="Primary navigation">
           <div className="nav-group">
             <p className="nav-label">ACADEMY</p>
-            {navItems.slice(0, 3).map((item) => (
+            {navItems.slice(0, 4).map((item) => (
               <button
                 key={item.view}
                 className={view === item.view || (view === "module" && item.view === "path") ? "active" : ""}
@@ -322,7 +385,7 @@ export default function AcademyApp() {
           </div>
           <div className="nav-group">
             <p className="nav-label">FIELD TOOLS</p>
-            {navItems.slice(3).map((item) => (
+            {navItems.slice(4).map((item) => (
               <button
                 key={item.view}
                 className={view === item.view ? "active" : ""}
@@ -336,10 +399,10 @@ export default function AcademyApp() {
         </nav>
 
         <div className="sidebar-progress">
-          <div className="progress-ring" role="progressbar" aria-label="Core path completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completion)} style={{ "--progress": `${completion * 3.6}deg` } as React.CSSProperties}>
+          <div className="progress-ring" role="progressbar" aria-label="VOD readiness" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completion)} style={{ "--progress": `${completion * 3.6}deg` } as React.CSSProperties}>
             <span>{Math.round(completion)}%</span>
           </div>
-          <div><strong>{curriculumStats.coreReady ? "VOD LITERATE" : operatorStats.rank.name}</strong><small>{curriculumStats.corePassed}/{curriculumStats.coreTotal} core · {curriculumStats.bonusPassed}/{curriculumStats.bonusTotal} bonus</small></div>
+          <div><strong>{curriculumStats.vodLiterate ? "VOD LITERATE" : curriculumStats.coreReady ? "SCREEN ORIENTED" : operatorStats.rank.name}</strong><small>{curriculumStats.corePassed}/{curriculumStats.coreTotal} core · {progress.readinessExamBest ?? 0}% exam</small></div>
         </div>
 
         <div className="sidebar-note">
@@ -377,7 +440,7 @@ export default function AcademyApp() {
                 setProgress={setProgress}
               />
             )}
-            {view === "path" && <Curriculum progress={progress} openModule={openModule} />}
+            {view === "path" && <Curriculum progress={progress} openModule={openModule} openReadiness={() => navigate("readiness")} />}
             {view === "module" && (
               <ModuleView
                 module={activeModule}
@@ -386,6 +449,31 @@ export default function AcademyApp() {
                 saveNote={(note) => setProgress((current) => ({ ...current, notes: { ...current.notes, [activeModule.id]: note } }))}
                 openModule={openModule}
                 back={() => navigate("path")}
+              />
+            )}
+            {view === "readiness" && (
+              <ReadinessLab
+                practiceAnswers={progress.readinessPractice}
+                examBest={progress.readinessExamBest}
+                examDomains={progress.readinessExamDomains}
+                examPassedAt={progress.readinessPassedAt}
+                screenOriented={curriculumStats.coreReady}
+                qualityVodNotes={curriculumStats.qualityVodNotes}
+                onPracticeAnswer={(scenarioId, answer) => setProgress((current) => ({
+                  ...current,
+                  readinessPractice: { ...current.readinessPractice, [scenarioId]: answer },
+                }))}
+                onExamResult={(result: ReadinessExamResult) => setProgress((current) => {
+                  const previousBest = current.readinessExamBest ?? 0;
+                  const improved = result.score >= previousBest;
+                  return {
+                    ...current,
+                    readinessExamBest: Math.max(previousBest, result.score),
+                    readinessExamDomains: improved ? result.domainScores : current.readinessExamDomains,
+                    ...(result.passed ? { readinessPassedAt: current.readinessPassedAt ?? new Date().toISOString() } : {}),
+                  };
+                })}
+                onOpenVod={() => openLab("vod")}
               />
             )}
             {view === "drills" && <Drills progress={progress} setProgress={setProgress} />}
@@ -434,11 +522,11 @@ function Dashboard({
     return courseModule ? progress.completed.includes(courseModule.id) : false;
   });
   const badges = [
-    { mark: "VL", label: "VOD literate", image: "/achievements/vod-literate.png", unlocked: curriculum.coreReady },
+    { mark: "VL", label: "VOD literate", image: "/achievements/vod-literate.png", unlocked: curriculum.vodLiterate },
     { mark: "MM", label: "Market mechanic", image: "/achievements/market-mechanic.png", unlocked: hasPassed([1, 2, 3, 4]) },
     { mark: "WC", label: "Wallet cartographer", image: "/achievements/wallet-cartographer.png", unlocked: hasPassed([5, 6]) },
     { mark: "RF", label: "Risk first", image: "/achievements/risk-first.png", unlocked: hasPassed([8]) },
-    { mark: "TA", label: "Tape analyst", image: "/achievements/tape-analyst.png", unlocked: hasPassed([7]) && progress.vodEntries.length >= 3 },
+    { mark: "TA", label: "Tape analyst", image: "/achievements/tape-analyst.png", unlocked: hasPassed([7]) && curriculum.qualityVodNotes >= 3 },
   ];
 
   return (
@@ -447,28 +535,40 @@ function Dashboard({
         <div>
           <p className="eyebrow"><span>◆</span> CORE PATH / SESSION BRIEF</p>
           <h1>Read the market.<br />Then build the machine.</h1>
-          <p>Eight core modules get you fluent enough to follow fast memecoin VODs. The bonus track shows how a manual read becomes a measured method, then guarded automation.</p>
+          <p>Eight core modules make the screen legible. Day 3 proves the skill on unseen terminal cases and evidence-grade VOD notes before the bonus track turns a read into a measured method.</p>
         </div>
         <ArtFrame asset={sectionArt.dashboard} className="dashboard-intro-art" decorative />
         <div className="dashboard-intro-meta">
           <div><span>CORE CLEARANCE</span><strong>{curriculum.corePassed}<small> / {curriculum.coreTotal}</small></strong></div>
           <div><span>LESSON CLOCK</span><strong>{Math.floor(weekendLessonMinutes / 60)}<small>H</small>{String(weekendLessonMinutes % 60).padStart(2, "0")}</strong></div>
-          <button className="primary-action" onClick={() => openModule(nextModule.id)}>{allComplete ? "Replay core" : curriculum.coreReady ? "Enter bonus" : "Resume training"}<span>→</span></button>
+          <button className="primary-action" onClick={() => curriculum.coreReady && !curriculum.vodLiterate ? navigate("readiness") : openModule(nextModule.id)}>{!curriculum.coreReady ? "Resume training" : !curriculum.vodLiterate ? "Prove readiness" : allComplete ? "Replay core" : "Enter bonus"}<span>→</span></button>
         </div>
       </header>
 
       <section className="command-grid" aria-label="Current learning workspace">
         <article className="current-mission">
-          <div className="panel-command"><span>CURRENT OBJECTIVE</span><b>{curriculum.coreReady ? "BONUS" : `DAY ${nextModule.weekendDay ?? "—"}`}</b></div>
-          <ArtFrame asset={moduleArt[nextModule.id]} className="mission-art" />
-          <div className="mission-module-code">M{String(nextModule.number).padStart(2, "0")}</div>
-          <p className="mission-track">{nextModule.track === "Weekend Core" ? "CORE PATH" : "BONUS ARSENAL"} · {nextModule.duration}</p>
-          <h2>{nextModule.title}</h2>
-          <p className="mission-outcome">{nextModule.outcome}</p>
-          <div className="mission-controls">
-            <button className="primary-action" onClick={() => openModule(nextModule.id)}>Continue module <span>→</span></button>
-            <button className="text-action" onClick={() => navigate("path")}>Open full path</button>
-          </div>
+          <div className="panel-command"><span>CURRENT OBJECTIVE</span><b>{curriculum.coreReady && !curriculum.vodLiterate ? "DAY 3" : curriculum.coreReady ? "BONUS" : `DAY ${nextModule.weekendDay ?? "—"}`}</b></div>
+          {curriculum.coreReady && !curriculum.vodLiterate ? <>
+            <ArtFrame asset={sectionArt.drills} className="mission-art" />
+            <div className="mission-module-code">D03</div>
+            <p className="mission-track">READINESS LAB · 90–120 MIN</p>
+            <h2>Prove the screen is actually legible.</h2>
+            <p className="mission-outcome">Translate two terminals, clear an unseen mixed exam, and save two complete VOD annotations. Completion—not recognition—unlocks VOD Literate.</p>
+            <div className="mission-controls">
+              <button className="primary-action" onClick={() => navigate("readiness")}>Enter Day 3 <span>→</span></button>
+              <button className="text-action" onClick={() => openLab("vod")}>Open VOD notebook</button>
+            </div>
+          </> : <>
+            <ArtFrame asset={moduleArt[nextModule.id]} className="mission-art" />
+            <div className="mission-module-code">M{String(nextModule.number).padStart(2, "0")}</div>
+            <p className="mission-track">{nextModule.track === "Weekend Core" ? "CORE PATH" : "BONUS ARSENAL"} · {nextModule.duration}</p>
+            <h2>{nextModule.title}</h2>
+            <p className="mission-outcome">{nextModule.outcome}</p>
+            <div className="mission-controls">
+              <button className="primary-action" onClick={() => openModule(nextModule.id)}>Continue module <span>→</span></button>
+              <button className="text-action" onClick={() => navigate("path")}>Open full path</button>
+            </div>
+          </>}
           <div className="mission-progress" role="progressbar" aria-label="Core VOD readiness" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completion)}><span><b>{Math.round(completion)}%</b> VOD READINESS</span><i><b style={{ width: `${completion}%` }} /></i></div>
           <div className="core-track" aria-label="Core module progress">
             {weekendCoreModules.map((courseModule) => {
@@ -539,18 +639,19 @@ function Dashboard({
 
       <section className="phase-preview">
         <div className="section-heading">
-          <div><p className="eyebrow">THE 2-DAY ROUTE</p><h2>Understand first. Specialize afterward.</h2></div>
+          <div><p className="eyebrow">THE 3-DAY ROUTE</p><h2>Understand. Prove it. Then specialize.</h2></div>
           <button onClick={() => navigate("path")}>View full curriculum →</button>
         </div>
         <div className="phase-cards">
           {[
-            { phase: "Day 1", range: "01—04 · 3H20", text: "Decode the game, money, lifecycle, and terminal screen.", color: "violet", moduleNumbers: [1, 2, 3, 4] },
-            { phase: "Day 2", range: "05—08 · 4H15", text: "Decode wallets, narratives, tape, risk, and decisions.", color: "green", moduleNumbers: [5, 6, 7, 8] },
-            { phase: "Bonus Arsenal", range: "09—12 · OPTIONAL", text: "Study setup families, execution, automation, and full VOD replay.", color: "amber", moduleNumbers: [9, 10, 11, 12] },
+            { phase: "Day 1", range: "01—04 · 3H20", text: "Decode the game, money, lifecycle, and terminal screen.", color: "violet", passed: modules.filter((module) => [1, 2, 3, 4].includes(module.number) && progress.completed.includes(module.id)).length, total: 4 },
+            { phase: "Day 2", range: "05—08 · 4H15", text: "Decode wallets, narratives, tape, risk, and decisions.", color: "green", passed: modules.filter((module) => [5, 6, 7, 8].includes(module.number) && progress.completed.includes(module.id)).length, total: 4 },
+            { phase: "Day 3", range: "UNSEEN LAB · 90–120M", text: "Translate terminals, annotate tape, and pass the readiness gate.", color: "cyan", passed: curriculum.vodLiterate ? 1 : 0, total: 1 },
+            { phase: "Bonus Arsenal", range: "09—12 · OPTIONAL", text: "Study setup families, execution, automation, and full VOD replay.", color: "amber", passed: curriculum.bonusPassed, total: curriculum.bonusTotal },
           ].map((item) => (
             <article className={`phase-card ${item.color}`} key={item.phase}>
               <span>{item.range}</span><h3>{item.phase}</h3><p>{item.text}</p>
-              <b>{modules.filter((module) => item.moduleNumbers.includes(module.number)).filter((module) => progress.completed.includes(module.id)).length}/{item.moduleNumbers.length} passed</b>
+              <b>{item.passed}/{item.total} passed</b>
             </article>
           ))}
         </div>
@@ -590,7 +691,7 @@ function Diagnostic({ progress, setProgress }: { progress: Progress; setProgress
             <button className="primary-action full" disabled={Object.keys(answers).length !== diagnosticQuestions.length} onClick={submit}>Score my baseline <span>→</span></button>
           ) : (
             <div className={`score-result ${score >= 80 ? "pass" : "review"}`} role="status">
-              <span>{score}%</span><div><b className="xp-award">BASELINE LOGGED · {earnedBaseline ? "+50 XP" : "BEST SCORE SAVED"}</b><strong>{score >= 80 ? "Screen-literate foundation" : "Good—now we know the gaps"}</strong><p>{score >= 80 ? "The course will turn that vocabulary into repeatable decisions." : "Start at Module 1. The score is a map, not a judgment."}</p></div>
+              <span>{score}%</span><div><b className="xp-award">BASELINE LOGGED · {earnedBaseline ? "+50 XP" : "BEST SCORE SAVED"}</b><strong>{score >= 80 ? "Strong vocabulary baseline" : "Good—now we know the gaps"}</strong><p>{score >= 80 ? "The course will turn that vocabulary into repeatable decisions." : "Start at Module 1. The score is a map, not a judgment."}</p></div>
             </div>
           )}
         </div>
@@ -599,7 +700,7 @@ function Diagnostic({ progress, setProgress }: { progress: Progress; setProgress
   );
 }
 
-function Curriculum({ progress, openModule }: { progress: Progress; openModule: (id: string) => void }) {
+function Curriculum({ progress, openModule, openReadiness }: { progress: Progress; openModule: (id: string) => void; openReadiness: () => void }) {
   const curriculum = getCurriculumStats(progress);
   const renderModuleCards = (courseModules: Module[]) => (
     <div className="module-list">
@@ -623,10 +724,10 @@ function Curriculum({ progress, openModule }: { progress: Progress; openModule: 
 
   return (
     <div className="page curriculum-page">
-      <PageLead eyebrow="CORE PATH + BONUS ARSENAL" title="Two days to screen literacy. The edge comes after." body={`Finish Modules 01–08 in ${Math.floor(weekendLessonMinutes / 60)}h ${weekendLessonMinutes % 60}m of lesson time—roughly 9–10 focused hours with checks and breaks. Modules 09–12 deepen the craft; they are not prerequisites for understanding a VOD.`} art={sectionArt.path} />
+      <PageLead eyebrow="CORE PATH + DAY 3 PROOF + BONUS" title="Two days to orientation. Day 3 proves it." body={`Finish Modules 01–08 in ${Math.floor(weekendLessonMinutes / 60)}h ${weekendLessonMinutes % 60}m of lesson time. Then use unseen terminal cases and real VOD annotations to prove transfer before entering the optional specialist track.`} art={sectionArt.path} />
 
       <section className="weekend-status-panel">
-        <div><span>CORE STATUS</span><strong>{curriculum.coreReady ? "VOD LITERATE" : `${curriculum.corePassed}/${curriculum.coreTotal} CORE CLEARED`}</strong><p>{curriculum.coreReady ? "You have cleared the comprehension path. Move into the Bonus Arsenal to discover, test, and automate a method." : "Pass each core knowledge check at 75% or better. The goal is screen legibility—not instant profitability."}</p></div>
+        <div><span>CORE STATUS</span><strong>{curriculum.vodLiterate ? "VOD LITERATE" : curriculum.coreReady ? "SCREEN ORIENTED" : `${curriculum.corePassed}/${curriculum.coreTotal} CORE CLEARED`}</strong><p>{curriculum.vodLiterate ? "You cleared the performance gate. The Bonus Arsenal now deepens setups, execution, and automation." : curriculum.coreReady ? "The concepts are loaded. Day 3 now checks whether you can transfer them to unseen screens and VOD decisions." : "Pass each core knowledge check at 75% or better. The goal is screen orientation—not instant profitability."}</p></div>
         <div className="weekend-meter" role="progressbar" aria-label="Core path completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(curriculum.corePct)}><span>{Math.round(curriculum.corePct)}%</span><i><b style={{ width: `${curriculum.corePct}%` }} /></i></div>
       </section>
 
@@ -639,6 +740,12 @@ function Curriculum({ progress, openModule }: { progress: Progress; openModule: 
         {renderModuleCards(weekendCoreModules.filter((module) => module.weekendDay === 2))}
       </section>
 
+      <section className={`day3-curriculum-card ${curriculum.vodLiterate ? "complete" : ""}`}>
+        <div><p className="eyebrow">DAY 3 · PERFORMANCE GATE</p><h2>Prove it on material you have not memorized.</h2><p>Work through cross-platform screen translation, a 24-case practice deck, a distinct unseen exam, and two complete VOD annotations. This—not quiz completion—earns VOD Literate.</p></div>
+        <div className="day3-gate-metrics"><span><b>{progress.readinessExamBest ?? 0}%</b> best exam</span><span><b>{curriculum.qualityVodNotes}/2</b> complete notes</span><span><b>{curriculum.vodLiterate ? "PASS" : "OPEN"}</b> gate</span></div>
+        <button className="primary-action" onClick={openReadiness}>{curriculum.vodLiterate ? "Review Day 3" : "Enter Day 3"}<span>→</span></button>
+      </section>
+
       <section className="edge-loop-panel">
         <div><p className="eyebrow">THE BRIDGE TO YOUR OWN METHOD</p><h2>There is no single playbook to copy.</h2><p>Choose a universe, wait for a state, require evidence, define a trigger, control size, and specify the exit. That combination is your hypothesis—not yet your edge.</p></div>
         <ol>{["Observe", "Define", "Journal", "Test", "Alert", "Automate"].map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, "0")}</span><strong>{step}</strong>{index < 5 && <b>→</b>}</li>)}</ol>
@@ -646,7 +753,7 @@ function Curriculum({ progress, openModule }: { progress: Progress; openModule: 
       </section>
 
       <section className="curriculum-phase bonus-phase">
-        <div className="phase-divider"><span>Bonus Arsenal · Specialize after literacy</span><i /></div>
+        <div className="phase-divider"><span>Bonus Arsenal · Specialize after demonstrated literacy</span><i /></div>
         {renderModuleCards(bonusArsenalModules)}
       </section>
     </div>
@@ -899,11 +1006,8 @@ function HistoryLab() {
     <div className="history-layout">
       <aside className="history-list">{historicalCases.map((entry, index) => <button className={entry.id === open ? "active" : ""} onClick={() => setOpen(entry.id)} key={entry.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{entry.name}</strong><small>{entry.period}</small></div></button>)}</aside>
       <article className="history-case">
-        <p className="eyebrow">{item.archetype.toUpperCase()} · {item.period}</p><h2>{item.name}</h2><p className="history-thesis">{item.thesis}</p>
         <ArtFrame asset={historyArt[item.id]} className="history-art" />
-        <div className="timeline">{item.sequence.map((event) => <div key={`${event.when}-${event.event}`}><span>{event.when}</span><i /><p>{event.event}</p></div>)}</div>
-        <div className="history-columns"><div><span className="section-kicker">KNOWABLE THEN</span><ul>{item.knowable.map((fact) => <li key={fact}>{fact}</li>)}</ul></div><div><span className="section-kicker">HINDSIGHT TRAP</span><p>{item.hindsightTrap}</p></div></div>
-        <div className="history-drill"><span>REPLAY ASSIGNMENT</span><p>{item.drill}</p></div>
+        <ProgressiveReplay historicalCase={item} />
         <SourceChips ids={item.sources} />
       </article>
     </div>
@@ -911,12 +1015,39 @@ function HistoryLab() {
 }
 
 function VodNotebook({ progress, setProgress }: { progress: Progress; setProgress: React.Dispatch<React.SetStateAction<Progress>> }) {
-  const [draft, setDraft] = useState<Omit<VodEntry, "id">>({ url: "https://kick.com/hotted/videos", timestamp: "", action: "", observation: "", thesis: "", invalidation: "", evidenceGrade: "Visible on screen" });
+  const [draft, setDraft] = useState<Omit<VodEntry, "id">>({
+    url: "https://kick.com/hotted/videos",
+    timestamp: "",
+    platform: "Axiom",
+    tokenState: "",
+    action: "",
+    observation: "",
+    thesis: "",
+    trigger: "",
+    sizeRisk: "",
+    invalidation: "",
+    exitPlan: "",
+    skippedAlternative: "",
+    evidenceGrade: "Visible on screen",
+  });
+  const draftScore = scoreVodAnnotationCompleteness(draft);
   const add = () => {
     if (!draft.timestamp || !draft.observation) return;
     const entry: VodEntry = { ...draft, id: `${Date.now()}-${Math.random().toString(16).slice(2)}` };
     setProgress((current) => ({ ...current, vodEntries: [...current.vodEntries, entry] }));
-    setDraft((current) => ({ ...current, timestamp: "", action: "", observation: "", thesis: "", invalidation: "" }));
+    setDraft((current) => ({
+      ...current,
+      timestamp: "",
+      tokenState: "",
+      action: "",
+      observation: "",
+      thesis: "",
+      trigger: "",
+      sizeRisk: "",
+      invalidation: "",
+      exitPlan: "",
+      skippedAlternative: "",
+    }));
   };
   const exportNotes = () => {
     const blob = new Blob([JSON.stringify(progress.vodEntries, null, 2)], { type: "application/json" });
@@ -926,19 +1057,21 @@ function VodNotebook({ progress, setProgress }: { progress: Progress; setProgres
   return (
     <div className="vod-layout">
       <section className="vod-protocol">
-        <p className="eyebrow">THE 11-LINE OBSERVATION PROTOCOL</p><h2>Make the VOD give up its decision process.</h2>
+        <p className="eyebrow">THE 13-FIELD OBSERVATION PROTOCOL</p><h2>Make the VOD give up its decision process.</h2>
         <ol>{[
-          "Evidence: URL, date, timecode, screenshot, exact spoken claim.",
-          "Identity: exact CA, narrative, launchpad, route.",
-          "Lifecycle: prebond, final stretch, migrating, post-migration.",
-          "Snapshot: interval, MC, liquidity, volume window, makers, holders.",
-          "Labels: provider, definition, denominator, current vs initial.",
-          "Trigger: what visibly changed before the decision?",
-          "Execution: intended size, actual fill, impact, costs, failures.",
-          "Risk: invalidation, loss budget, exit/tranche rule.",
-          "Outcome: realized net flow, holding time, partials.",
-          "Counterfactual: what was skipped and what would falsify it?",
-          "Evidence grade: on-chain / screen / spoken / inference.",
+          "Traceability: URL, platform, exact timecode.",
+          "State: CA context, lifecycle, age, route, liquidity and flow.",
+          "Action: buy, skip, add, trim or exit—with visible size if known.",
+          "Observation: what was actually visible before the action?",
+          "Evidence grade: on-chain, screen, spoken or inference.",
+          "Trigger: what changed immediately before the decision?",
+          "Thesis: why might that change matter?",
+          "Size and risk: what exposure was visible or disclosed?",
+          "Invalidation: what future event would make the read wrong?",
+          "Exit plan: partials, level, behavior or time stop.",
+          "Skipped alternative: why this coin instead of the adjacent one?",
+          "No hindsight: later price and PnL are not entry evidence.",
+          "No invention: write ‘not disclosed’ instead of guessing.",
         ].map((item, index) => <li key={item}><span>{String(index + 1).padStart(2, "0")}</span>{item}</li>)}</ol>
         <a className="external-action" href="https://kick.com/hotted/videos" target="_blank" rel="noreferrer">Open Hotted’s public VOD page ↗</a>
         <p className="retention-note">Public VOD availability is dynamic. Kick says verified-channel replays may be retained for up to 30 days, with at most 30 replays. Archive your URL, date, timestamp, and contemporaneous note. The academy does not verify titles or income claims.</p>
@@ -947,25 +1080,30 @@ function VodNotebook({ progress, setProgress }: { progress: Progress; setProgres
         <div className="notebook-head"><div><p className="section-kicker">NEW OBSERVATION</p><h2>Lock the evidence before the story.</h2></div><span>{progress.vodEntries.length} saved</span></div>
         <div className="notebook-form">
           <label><span>VOD URL</span><input value={draft.url} onChange={(event) => setDraft({ ...draft, url: event.target.value })} /></label>
-          <div className="form-row"><label><span>Timestamp</span><input placeholder="01:24:36" value={draft.timestamp} onChange={(event) => setDraft({ ...draft, timestamp: event.target.value })} /></label><label><span>Action</span><input placeholder="Buy / skip / trim / sell" value={draft.action} onChange={(event) => setDraft({ ...draft, action: event.target.value })} /></label></div>
+          <div className="form-row"><label><span>Timestamp</span><input placeholder="01:24:36" value={draft.timestamp} onChange={(event) => setDraft({ ...draft, timestamp: event.target.value })} /></label><label><span>Platform / screen</span><input placeholder="Axiom Pulse" value={draft.platform} onChange={(event) => setDraft({ ...draft, platform: event.target.value })} /></label></div>
+          <label><span>Token state snapshot</span><textarea placeholder="Lifecycle, age, route, MC, liquidity, makers, ownership evidence…" value={draft.tokenState} onChange={(event) => setDraft({ ...draft, tokenState: event.target.value })} /></label>
+          <div className="form-row"><label><span>Action</span><input placeholder="Initial 0.5 SOL buy / skip / trim 25%" value={draft.action} onChange={(event) => setDraft({ ...draft, action: event.target.value })} /></label><label><span>Evidence grade</span><select value={draft.evidenceGrade} onChange={(event) => setDraft({ ...draft, evidenceGrade: event.target.value })}>{evidenceGrades.map((grade) => <option key={grade}>{grade}</option>)}</select></label></div>
           <label><span>Visible observation</span><textarea placeholder="What changed on screen? No motive yet." value={draft.observation} onChange={(event) => setDraft({ ...draft, observation: event.target.value })} /></label>
+          <label><span>Decision trigger</span><textarea placeholder="Why did the action happen now instead of thirty seconds earlier?" value={draft.trigger} onChange={(event) => setDraft({ ...draft, trigger: event.target.value })} /></label>
           <label><span>Your thesis / inference</span><textarea placeholder="Why might that evidence matter?" value={draft.thesis} onChange={(event) => setDraft({ ...draft, thesis: event.target.value })} /></label>
-          <label><span>Invalidation / counterfactual</span><textarea placeholder="What next event would make the read wrong?" value={draft.invalidation} onChange={(event) => setDraft({ ...draft, invalidation: event.target.value })} /></label>
-          <label><span>Evidence grade</span><select value={draft.evidenceGrade} onChange={(event) => setDraft({ ...draft, evidenceGrade: event.target.value })}><option>On-chain verified</option><option>Visible on screen</option><option>Spoken claim</option><option>Analyst inference</option></select></label>
+          <div className="form-row"><label><span>Size / loss context</span><textarea placeholder="Visible size, loss budget, fill or ‘not disclosed’." value={draft.sizeRisk} onChange={(event) => setDraft({ ...draft, sizeRisk: event.target.value })} /></label><label><span>Invalidation</span><textarea placeholder="What next event would make the read wrong?" value={draft.invalidation} onChange={(event) => setDraft({ ...draft, invalidation: event.target.value })} /></label></div>
+          <div className="form-row"><label><span>Exit / management plan</span><textarea placeholder="Partials, behavior, level or time stop—only if visible or spoken." value={draft.exitPlan} onChange={(event) => setDraft({ ...draft, exitPlan: event.target.value })} /></label><label><span>Skipped alternative</span><textarea placeholder="What adjacent token or action was rejected, and why?" value={draft.skippedAlternative} onChange={(event) => setDraft({ ...draft, skippedAlternative: event.target.value })} /></label></div>
+          <div className={`vod-quality-meter ${draftScore.percent >= 88 ? "complete" : ""}`} role="status"><div><span>ANNOTATION COMPLETENESS</span><strong>{draftScore.percent}% · {draftScore.band}</strong></div><p>{draftScore.percent >= 88 ? "Complete enough for the Day 3 gate. This still does not prove the thesis or profitability." : `Missing or thin: ${draftScore.missingFields.slice(0, 4).join(", ") || "add more decision detail"}.`}</p><i><b style={{ width: `${draftScore.percent}%` }} /></i></div>
           <button className="primary-action full" onClick={add} disabled={!draft.timestamp || !draft.observation}>Save observation <span>＋</span></button>
         </div>
         {progress.vodEntries.length > 0 && (
           <div className="saved-observations">
             <div className="saved-head"><strong>Saved tape</strong><button onClick={exportNotes}>Export JSON</button></div>
-            {[...progress.vodEntries].reverse().map((entry) => (
-              <article key={entry.id}>
-                <div><span>{entry.timestamp}</span><b>{entry.action || "OBSERVE"}</b><small>{entry.evidenceGrade}</small></div>
+            {[...progress.vodEntries].reverse().map((entry) => {
+              const result = scoreVodAnnotationCompleteness(entry);
+              return <article key={entry.id}>
+                <div><span>{entry.timestamp}</span><b>{entry.action || "OBSERVE"}</b><small>{result.percent}% · {result.band}</small></div>
                 <p><strong>VISIBLE</strong> {entry.observation}</p>
                 {entry.thesis && <p><strong>INFERENCE</strong> {entry.thesis}</p>}
                 {entry.invalidation && <p><strong>INVALIDATION</strong> {entry.invalidation}</p>}
                 <button onClick={() => setProgress((current) => ({ ...current, vodEntries: current.vodEntries.filter((item) => item.id !== entry.id) }))}>Remove</button>
-              </article>
-            ))}
+              </article>;
+            })}
           </div>
         )}
       </section>

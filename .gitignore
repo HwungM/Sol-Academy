@@ -38,6 +38,7 @@ yarn-error.log*
 /.wrangler/
 /outputs/
 /work/
+*.tsbuildinfo
 
 # Internal research synthesis (not part of the public course repository)
 /report-source.md
