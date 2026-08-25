@@ -115,3 +115,51 @@ test("ships optimized RGBA achievement artwork", async () => {
     assert.ok(png.length < 200_000, `${name} should stay optimized for the achievement rack`);
   }
 });
+
+test("all mapped editorial art assets exist", async () => {
+  const expectedCounts = {
+    modules: 12,
+    drills: 6,
+    history: 9,
+    sections: 5,
+  };
+  const manifest = await readFile(new URL("../app/data/art.ts", import.meta.url), "utf8");
+  const mappings = [...manifest.matchAll(/:\s*asset\("([^"]+)",\s*"([^"]+)"\s*,/g)].map(
+    ([, category, id]) => ({ category, id }),
+  );
+
+  assert.equal(mappings.length, 32, "the art manifest should map exactly 32 assets");
+  assert.equal(new Set(mappings.map(({ category, id }) => `${category}/${id}`)).size, 32, "art mappings must be unique");
+
+  for (const [category, expectedCount] of Object.entries(expectedCounts)) {
+    const actualCount = mappings.filter((mapping) => mapping.category === category).length;
+    assert.equal(actualCount, expectedCount, `${category} should map ${expectedCount} assets`);
+  }
+
+  assert.deepEqual(
+    [...new Set(mappings.map(({ category }) => category))].sort(),
+    Object.keys(expectedCounts).sort(),
+    "the manifest should contain only the expected art categories",
+  );
+
+  await Promise.all(
+    mappings.map(async ({ category, id }) => {
+      const assetUrl = new URL(`../public/art/${category}/${id}.webp`, import.meta.url);
+      await assert.doesNotReject(access(assetUrl), `missing mapped art asset: /art/${category}/${id}.webp`);
+    }),
+  );
+});
+
+test("ships a correctly sized social preview card", async () => {
+  const [layout, png] = await Promise.all([
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../public/og.png", import.meta.url)),
+  ]);
+
+  assert.match(layout, /url: "\/og\.png"/);
+  assert.match(layout, /width: 1200/);
+  assert.match(layout, /height: 630/);
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(png.readUInt32BE(16), 1200);
+  assert.equal(png.readUInt32BE(20), 630);
+});

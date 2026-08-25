@@ -12,6 +12,7 @@ import {
   type Question,
 } from "./data/course";
 import { drills, glossary, historicalCases } from "./data/labs";
+import { drillArt, historyArt, moduleArt, sectionArt, type ArtAsset } from "./data/art";
 
 type View = "dashboard" | "path" | "module" | "drills" | "lab" | "glossary" | "sources";
 type LabTab = "calculators" | "history" | "vod";
@@ -448,6 +449,7 @@ function Dashboard({
           <h1>Read the market.<br />Then build the machine.</h1>
           <p>Eight core modules get you fluent enough to follow fast memecoin VODs. The bonus track shows how a manual read becomes a measured method, then guarded automation.</p>
         </div>
+        <ArtFrame asset={sectionArt.dashboard} className="dashboard-intro-art" decorative />
         <div className="dashboard-intro-meta">
           <div><span>CORE CLEARANCE</span><strong>{curriculum.corePassed}<small> / {curriculum.coreTotal}</small></strong></div>
           <div><span>LESSON CLOCK</span><strong>{Math.floor(weekendLessonMinutes / 60)}<small>H</small>{String(weekendLessonMinutes % 60).padStart(2, "0")}</strong></div>
@@ -458,6 +460,7 @@ function Dashboard({
       <section className="command-grid" aria-label="Current learning workspace">
         <article className="current-mission">
           <div className="panel-command"><span>CURRENT OBJECTIVE</span><b>{curriculum.coreReady ? "BONUS" : `DAY ${nextModule.weekendDay ?? "—"}`}</b></div>
+          <ArtFrame asset={moduleArt[nextModule.id]} className="mission-art" />
           <div className="mission-module-code">M{String(nextModule.number).padStart(2, "0")}</div>
           <p className="mission-track">{nextModule.track === "Weekend Core" ? "CORE PATH" : "BONUS ARSENAL"} · {nextModule.duration}</p>
           <h2>{nextModule.title}</h2>
@@ -608,6 +611,7 @@ function Curriculum({ progress, openModule }: { progress: Progress; openModule: 
           <article className={`module-row ${completed ? "complete" : ""} ${current ? "current" : ""}`} key={courseModule.id}>
             <div className="module-node"><i />{completed && <b>✓</b>}</div>
             <div className="module-row-code"><span>M{String(courseModule.number).padStart(2, "0")}</span><small>{courseModule.duration}</small></div>
+            <ArtFrame asset={moduleArt[courseModule.id]} className="module-row-art" decorative />
             <div className="module-row-copy"><div><b>{completed ? "PASSED" : current ? "UP NEXT" : courseModule.track === "Weekend Core" ? `DAY ${courseModule.weekendDay}` : "BONUS"}</b>{score !== undefined && <small>BEST {score}%</small>}</div><h3>{courseModule.title}</h3><p>{courseModule.outcome}</p></div>
             <div className="module-row-meta"><span>{courseModule.quiz.length} checks</span><span>{courseModule.difficulty}</span></div>
             <button onClick={() => openModule(courseModule.id)} aria-label={`${completed ? "Review" : "Open"} ${courseModule.title}`}><span>{completed ? "Review" : current ? "Continue" : "Open"}</span><b>→</b></button>
@@ -619,7 +623,7 @@ function Curriculum({ progress, openModule }: { progress: Progress; openModule: 
 
   return (
     <div className="page curriculum-page">
-      <PageLead eyebrow="CORE PATH + BONUS ARSENAL" title="Two days to screen literacy. The edge comes after." body={`Finish Modules 01–08 in ${Math.floor(weekendLessonMinutes / 60)}h ${weekendLessonMinutes % 60}m of lesson time—roughly 9–10 focused hours with checks and breaks. Modules 09–12 deepen the craft; they are not prerequisites for understanding a VOD.`} />
+      <PageLead eyebrow="CORE PATH + BONUS ARSENAL" title="Two days to screen literacy. The edge comes after." body={`Finish Modules 01–08 in ${Math.floor(weekendLessonMinutes / 60)}h ${weekendLessonMinutes % 60}m of lesson time—roughly 9–10 focused hours with checks and breaks. Modules 09–12 deepen the craft; they are not prerequisites for understanding a VOD.`} art={sectionArt.path} />
 
       <section className="weekend-status-panel">
         <div><span>CORE STATUS</span><strong>{curriculum.coreReady ? "VOD LITERATE" : `${curriculum.corePassed}/${curriculum.coreTotal} CORE CLEARED`}</strong><p>{curriculum.coreReady ? "You have cleared the comprehension path. Move into the Bonus Arsenal to discover, test, and automate a method." : "Pass each core knowledge check at 75% or better. The goal is screen legibility—not instant profitability."}</p></div>
@@ -677,7 +681,10 @@ function ModuleView({
           <h1>{module.title}</h1>
           <p>{module.kicker}</p>
         </div>
-        <div className="outcome-box"><span>SESSION OUTCOME</span><p>{module.outcome}</p><b>{passed ? "PASSED" : (progress.scores[module.id] !== undefined ? `BEST ${progress.scores[module.id]}%` : "NOT SCORED")}</b></div>
+        <div className="module-hero-side">
+          <ArtFrame asset={moduleArt[module.id]} className="module-hero-art" />
+          <div className="outcome-box"><span>SESSION OUTCOME</span><p>{module.outcome}</p><b>{passed ? "PASSED" : (progress.scores[module.id] !== undefined ? `BEST ${progress.scores[module.id]}%` : "NOT SCORED")}</b></div>
+        </div>
       </header>
       <nav className="module-section-strip" aria-label="Module sections">{module.sections.map((section, itemIndex) => <a href={`#section-${itemIndex}`} key={section.title}><span>{String(itemIndex + 1).padStart(2, "0")}</span>{section.title}</a>)}</nav>
 
@@ -773,12 +780,13 @@ function Drills({ progress, setProgress }: { progress: Progress; setProgress: Re
   const answer = (choice: number) => setProgress((current) => ({ ...current, drillAnswers: { ...current.drillAnswers, [drill.id]: choice } }));
   return (
     <div className="page drills-page">
-      <PageLead eyebrow="DECISION DRILLS" title="Turn labels into the next question." body="These are not buy calls. They train the exact move experts make between a screen metric and a defensible decision." />
+      <PageLead eyebrow="DECISION DRILLS" title="Turn labels into the next question." body="These are not buy calls. They train the exact move experts make between a screen metric and a defensible decision." art={sectionArt.drills} />
       <div className="simulation-hud" aria-label="Decision drill performance"><span><i /> SIMULATION ONLINE</span><b>{answeredCount}/{drills.length} CASES LOGGED</b><b>{correctCount} CLEAN READS</b><strong>{accuracy === undefined ? "—" : `${accuracy}%`}<small> ACCURACY</small></strong></div>
       <div className="drill-tabs" role="tablist" aria-label="Decision drills">{drills.map((item, index) => <button role="tab" aria-selected={item.id === active} className={item.id === active ? "active" : ""} onClick={() => setActive(item.id)} key={item.id}><span>{String(index + 1).padStart(2, "0")}</span>{item.label}{progress.drillAnswers[item.id] !== undefined && <b>✓</b>}</button>)}</div>
       <section className="drill-stage">
         <div className="drill-context">
           <p className="eyebrow">{drill.label.toUpperCase()} · {drill.skill.toUpperCase()}</p><h2>{drill.title}</h2><p>{drill.setup}</p>
+          <ArtFrame asset={drillArt[drill.id]} className="drill-art" />
           <div className="metric-board">{drill.metrics.map((metric) => <div className={metric.tone ?? "neutral"} key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div>
         </div>
         <div className="drill-decision">
@@ -794,7 +802,7 @@ function Drills({ progress, setProgress }: { progress: Progress; setProgress: Re
 function OperatorLab({ tab, setTab, progress, setProgress }: { tab: LabTab; setTab: (tab: LabTab) => void; progress: Progress; setProgress: React.Dispatch<React.SetStateAction<Progress>> }) {
   return (
     <div className="page lab-page">
-      <PageLead eyebrow="OPERATOR LAB" title="Calculate, replay, annotate." body="Use toy models to build intuition, timestamped history to fight hindsight, and a structured worksheet to extract decisions from public VODs." />
+      <PageLead eyebrow="OPERATOR LAB" title="Calculate, replay, annotate." body="Use toy models to build intuition, timestamped history to fight hindsight, and a structured worksheet to extract decisions from public VODs." art={sectionArt.lab} />
       <div className="lab-tabs">{(["calculators", "history", "vod"] as LabTab[]).map((item) => <button className={tab === item ? "active" : ""} onClick={() => setTab(item)} key={item}>{item === "calculators" ? "Math desk" : item === "history" ? "Historical tape" : "VOD notebook"}</button>)}</div>
       {tab === "calculators" && <Calculators />}
       {tab === "history" && <HistoryLab />}
@@ -892,6 +900,7 @@ function HistoryLab() {
       <aside className="history-list">{historicalCases.map((entry, index) => <button className={entry.id === open ? "active" : ""} onClick={() => setOpen(entry.id)} key={entry.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{entry.name}</strong><small>{entry.period}</small></div></button>)}</aside>
       <article className="history-case">
         <p className="eyebrow">{item.archetype.toUpperCase()} · {item.period}</p><h2>{item.name}</h2><p className="history-thesis">{item.thesis}</p>
+        <ArtFrame asset={historyArt[item.id]} className="history-art" />
         <div className="timeline">{item.sequence.map((event) => <div key={`${event.when}-${event.event}`}><span>{event.when}</span><i /><p>{event.event}</p></div>)}</div>
         <div className="history-columns"><div><span className="section-kicker">KNOWABLE THEN</span><ul>{item.knowable.map((fact) => <li key={fact}>{fact}</li>)}</ul></div><div><span className="section-kicker">HINDSIGHT TRAP</span><p>{item.hindsightTrap}</p></div></div>
         <div className="history-drill"><span>REPLAY ASSIGNMENT</span><p>{item.drill}</p></div>
@@ -1006,7 +1015,7 @@ function Sources() {
   const filtered = sources.filter((source) => category === "All" || source.category === category);
   return (
     <div className="page sources-page">
-      <PageLead eyebrow="EVIDENCE LIBRARY" title="Primary mechanics. Scoped claims. Visible caveats." body={`Research cutoff: ${researchCutoff}. Protocol behavior is versioned; re-open the linked documentation before relying on a current fee, route, or detector.`} />
+      <PageLead eyebrow="EVIDENCE LIBRARY" title="Primary mechanics. Scoped claims. Visible caveats." body={`Research cutoff: ${researchCutoff}. Protocol behavior is versioned; re-open the linked documentation before relying on a current fee, route, or detector.`} art={sectionArt.sources} />
       <div className="source-policy"><span>THE SOURCE RULE</span><p>Official protocol documentation establishes mechanics. Transparent datasets establish scoped base rates. Investigations establish evidence patterns. Community language supplies leads—not truth.</p></div>
       <div className="category-tabs">{categories.map((item) => <button className={category === item ? "active" : ""} onClick={() => setCategory(item)} key={item}>{item}</button>)}</div>
       <div className="source-list">{filtered.map((source, index) => <a href={source.url} target="_blank" rel="noreferrer" key={source.id}><span>{String(index + 1).padStart(2, "0")}</span><div><p>{source.category} · {source.date}</p><h2>{source.title}</h2><strong>{source.publisher}</strong><small>{source.note}</small></div><b>↗</b></a>)}</div>
@@ -1015,8 +1024,26 @@ function Sources() {
   );
 }
 
-function PageLead({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
-  return <header className="page-lead"><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{body}</p></header>;
+function ArtFrame({ asset, className, decorative = false }: { asset?: ArtAsset; className: string; decorative?: boolean }) {
+  if (!asset) return null;
+  return (
+    <div
+      className={`art-frame ${className}`}
+      style={{ backgroundImage: `url(${asset.src})` }}
+      role={decorative ? undefined : "img"}
+      aria-label={decorative ? undefined : asset.alt}
+      aria-hidden={decorative || undefined}
+    />
+  );
+}
+
+function PageLead({ eyebrow, title, body, art }: { eyebrow: string; title: string; body: string; art?: ArtAsset }) {
+  return (
+    <header className={`page-lead ${art ? "with-art" : ""}`}>
+      <div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{body}</p></div>
+      {art && <ArtFrame asset={art} className="page-lead-art" />}
+    </header>
+  );
 }
 
 function SourceChips({ ids }: { ids: string[] }) {

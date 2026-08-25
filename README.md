@@ -18,6 +18,7 @@ The product includes:
 - a searchable trench-language glossary
 - a local VOD observation notebook with JSON export
 - an evidence library linking claims to primary documentation, on-chain research, and clearly labeled secondary reporting
+- a commissioned 32-piece editorial image system for modules, drills, history cases, and major workspaces; see [the art direction](docs/art-direction.md)
 
 ## Run locally
 
@@ -38,7 +39,7 @@ Progress and notebook entries stay in your browser's local storage. The app does
 npm test
 ```
 
-The test command creates a production build, checks the rendered product shell, verifies the complete course corpus, rejects private screenshot identifiers, and validates every evidence-library URL.
+The test command creates a production build, checks the rendered product shell, verifies the complete course corpus, rejects private screenshot identifiers, validates every evidence-library URL, and confirms that all mapped editorial assets and social metadata ship correctly.
 
 ## Learning model
 

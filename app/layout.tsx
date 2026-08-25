@@ -19,6 +19,26 @@ export const metadata: Metadata = {
   title: "Sol Academy — Memecoin Market Literacy",
   description:
     "An evidence-first academy for Solana memecoin mechanics, wallet forensics, risk, execution, and VOD study.",
+  openGraph: {
+    title: "Sol Academy — Memecoin Market Literacy",
+    description:
+      "Read the market. Then build the machine. An evidence-first path to Solana memecoin literacy.",
+    type: "website",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Sol Academy — Read the market. Then build the machine.",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sol Academy — Memecoin Market Literacy",
+    description: "Read the market. Then build the machine.",
+    images: ["/og.png"],
+  },
 };
 
 export default function RootLayout({
