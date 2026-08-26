@@ -5,7 +5,7 @@ An interactive, evidence-backed course for learning how Solana memecoin markets 
 The academy has a three-day orientation and proof path, followed by optional depth:
 
 - **Day 1 — Market orientation:** Modules 01–04 cover the game map, money math, token lifecycle, and terminal literacy.
-- **Day 2 — Decision orientation:** Modules 05–08 cover wallet evidence, narratives, tape reading, and risk. Together, Days 1 and 2 contain 7h35 of lesson material, or roughly 9–10 focused hours with checks and breaks.
+- **Day 2 — Decision orientation:** Modules 05–08 cover wallet evidence, narratives, tape reading, and risk. Together, Days 1 and 2 contain 9h35 of guided lesson material, or roughly 11–12 focused hours with explanation checks and breaks.
 - **Day 3 — Performance gate:** A 90–120 minute lab translates concepts across terminals, provides 16 guided practice scenarios, and ends with 16 different exam scenarios. Passing requires at least 85% overall, no domain below 50%, every critical-error scenario correct, and two VOD annotations scoring at least 88% for completeness.
 - **Bonus Arsenal:** Modules 09–12 deepen setup families, execution internals, automation architecture, historical replay, and VOD study after the core performance proof.
 - **Edge Foundry:** A final six-stage research lab turns a personal observation into a versioned, falsifiable paper method with an untouched holdout, evidence ledger, red-team checks, and a guarded automation boundary.
@@ -13,6 +13,7 @@ The academy has a three-day orientation and proof path, followed by optional dep
 The product includes:
 
 - 12 sequenced modules split into Day 1, Day 2, and the optional Bonus Arsenal
+- a beginner-first layer in every section: plain-English model, first-use definitions, a worked example, and a revealable “Stop & Explain” check before the expert caveats
 - a Day 3 terminal lab with 16 practice and 16 unseen exam scenarios—exactly two per Screen, Math, Wallets, Narrative, Tape, Risk, Execution, and VOD domain
 - 48 module questions plus an entry diagnostic
 - decision drills built around incomplete, adversarial market data

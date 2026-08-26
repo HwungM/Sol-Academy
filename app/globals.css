@@ -2166,6 +2166,43 @@ a { color: inherit; }
 .observation-row.stale { opacity: .48; }
 .observation-row.stale small { color: var(--amber); }
 
+/* Beginner-first lesson layer */
+.lesson-mode-banner { max-width: 980px; display: grid; grid-template-columns: 180px minmax(0,1fr); gap: 22px; align-items: center; margin: 22px 0 0; padding: 15px 18px; border: 1px solid rgba(185,244,95,.2); border-radius: 7px; background: rgba(185,244,95,.025); }
+.lesson-mode-banner > span { color: var(--lime); font: 550 9px var(--font-mono); letter-spacing: .08em; }
+.lesson-mode-banner p { margin: 0; color: #858c92; font-size: 12px; line-height: 1.55; }
+.lesson-mode-banner p strong { color: #bcc1c5; font-weight: 600; }
+.lesson-guide { margin: 28px 0 34px; overflow: clip; border: 1px solid #30363d; border-radius: 9px; background: linear-gradient(145deg, rgba(185,244,95,.045), rgba(13,16,19,.98) 34%); box-shadow: 0 18px 50px rgba(0,0,0,.18); }
+.lesson-guide-copy { position: relative; padding: 24px 26px 23px 29px; border-left: 3px solid var(--lime); }
+.lesson-guide-copy > span, .lesson-walkthrough > span, .operator-depth span, .lesson-checkpoint summary > span { display: block; color: var(--lime); font: 550 9px var(--font-mono); letter-spacing: .08em; }
+.lesson-guide-copy > p { max-width: 760px; margin: 10px 0 0; color: #d0d4d7; font-size: 16px; line-height: 1.68; }
+.lesson-terms { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; border-top: 1px solid #252b31; background: rgba(6,8,10,.34); }
+.lesson-terms > div { min-width: 0; padding: 17px 20px; border-right: 1px solid #252b31; border-bottom: 1px solid #252b31; }
+.lesson-terms > div:nth-child(even) { border-right: 0; }
+.lesson-terms > div:nth-last-child(-n+2) { border-bottom: 0; }
+.lesson-terms > div:last-child:nth-child(odd) { grid-column: 1 / -1; border-right: 0; }
+.lesson-terms dt { color: var(--cyan); font: 550 11px var(--font-mono); }
+.lesson-terms dd { margin: 7px 0 0; color: #90979d; font-size: 12px; line-height: 1.58; }
+.lesson-walkthrough { padding: 22px 25px 25px; border-top: 1px solid #252b31; background: #0b0e11; }
+.lesson-walkthrough > span { color: var(--violet); }
+.lesson-walkthrough h3 { margin: 8px 0 17px; color: #c9cdd0; font-size: 19px; font-weight: 600; letter-spacing: -.015em; }
+.lesson-walkthrough ol { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.lesson-walkthrough li { display: grid; grid-template-columns: 35px minmax(0,1fr); gap: 12px; padding: 12px 0; border-top: 1px solid #22282e; }
+.lesson-walkthrough li b { color: #5d666e; font: 500 9px var(--font-mono); }
+.lesson-walkthrough li p { margin: 0; color: #9fa5aa; font-size: 13px; line-height: 1.58; }
+.operator-depth { display: flex; align-items: center; gap: 12px; margin: 34px 0 18px; }
+.operator-depth::after { height: 1px; flex: 1; content: ""; background: linear-gradient(90deg,#32383f,transparent); }
+.operator-depth span { color: #656d74; }
+.lesson-checkpoint { margin: 28px 0 8px; overflow: clip; border: 1px solid rgba(112,215,236,.24); border-radius: 7px; background: rgba(112,215,236,.025); }
+.lesson-checkpoint summary { position: relative; display: grid; grid-template-columns: 118px minmax(0,1fr) auto; gap: 16px; align-items: center; padding: 18px 48px 18px 19px; cursor: pointer; list-style: none; }
+.lesson-checkpoint summary::-webkit-details-marker { display: none; }
+.lesson-checkpoint summary::after { position: absolute; right: 19px; content: "+"; color: var(--cyan); font: 500 18px var(--font-mono); }
+.lesson-checkpoint[open] summary::after { content: "−"; }
+.lesson-checkpoint summary > span { color: var(--cyan); }
+.lesson-checkpoint summary > strong { color: #c0c5c9; font-size: 13px; font-weight: 550; line-height: 1.45; }
+.lesson-checkpoint summary > b { color: #687179; font: 500 9px var(--font-mono); white-space: nowrap; }
+.lesson-checkpoint > div { padding: 18px 20px 20px 153px; border-top: 1px solid rgba(112,215,236,.16); }
+.lesson-checkpoint > div p { margin: 0; color: #a8afb4; font-size: 13px; line-height: 1.65; }
+
 @media (max-width: 1120px) {
   .foundry-command { grid-template-columns: 1fr; }.foundry-status { max-width: 520px; }
   .method-grammar, .automation-map { grid-template-columns: repeat(3,1fr); }.method-grammar > div:nth-child(3), .automation-map > div:nth-child(3) { border-right: 0; }.method-grammar > div:nth-child(-n+3), .automation-map > div:nth-child(-n+3) { border-bottom: 1px solid var(--line); }
@@ -2180,6 +2217,10 @@ a { color: inherit; }
   .spec-group > div, .validation-grid, .red-team-panel ul, .foundry-boundary { grid-template-columns: 1fr; }.spec-group label { border-right: 0; }
   .filter-metrics { grid-template-columns: repeat(3,1fr); }.filter-metrics > span { grid-column: 1 / -1; min-height: 38px; border-bottom: 1px solid var(--line); }.filter-metrics > div { min-height: 58px; }
   .foundry-rule { grid-template-columns: 1fr; gap: 8px; }
+  .lesson-mode-banner { grid-template-columns: 1fr; gap: 7px; }
+  .lesson-checkpoint summary { grid-template-columns: 1fr; gap: 8px; }
+  .lesson-checkpoint summary > b { white-space: normal; }
+  .lesson-checkpoint > div { padding-left: 20px; }
 }
 
 @media (max-width: 560px) {
@@ -2189,6 +2230,12 @@ a { color: inherit; }
   .foundry-hud { grid-template-columns: 1fr; }.foundry-hud > div { border-right: 0; border-bottom: 1px solid var(--line); }
   .observation-form { grid-template-columns: 1fr; }.observation-form > label:nth-of-type(5), .observation-form > button { grid-column: auto; }.observation-form > div { grid-template-columns: 1fr; }
   .foundry-actions { align-items: stretch; flex-direction: column; }.foundry-actions button { width: 100%; }
+  .lesson-guide-copy { padding: 21px 19px 20px 22px; }
+  .lesson-guide-copy > p { font-size: 15px; }
+  .lesson-terms { grid-template-columns: 1fr; }
+  .lesson-terms > div, .lesson-terms > div:nth-child(even), .lesson-terms > div:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid #252b31; }
+  .lesson-terms > div:last-child { grid-column: auto; border-bottom: 0; }
+  .lesson-walkthrough { padding: 20px 18px; }
 }
 
 @keyframes routeEnter { from { opacity: 0; transform: translateY(8px); filter: blur(3px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }

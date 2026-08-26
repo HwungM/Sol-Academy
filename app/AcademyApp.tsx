@@ -19,6 +19,7 @@ import { ReadinessLab, type ReadinessExamResult } from "./ReadinessLab";
 import { CandleLab, CandlePrimer } from "./CandleLab";
 import { TrenchDecoder } from "./TrenchDecoder";
 import { EdgeFoundry } from "./EdgeFoundry";
+import { lessonGuideKey, lessonGuides, type LessonGuide } from "./data/lesson-guides";
 import {
   defaultFilterConfig,
   emptyEdgeDraft,
@@ -130,7 +131,7 @@ const operatorRanks: OperatorRank[] = [
 
 const weekendCoreModules = modules.filter((module) => module.track === "Weekend Core");
 const bonusArsenalModules = modules.filter((module) => module.track === "Bonus Arsenal");
-const weekendLessonMinutes = 455;
+const weekendLessonMinutes = 575;
 const courseModuleIds = new Set(modules.map((module) => module.id));
 
 const pct = (value: number) => {
@@ -793,8 +794,8 @@ function Dashboard({
         </div>
         <div className="phase-cards">
           {[
-            { phase: "Day 1", range: "01—04 · 3H20", text: "Decode the game, money, lifecycle, and terminal screen.", color: "violet", passed: modules.filter((module) => [1, 2, 3, 4].includes(module.number) && progress.completed.includes(module.id)).length, total: 4 },
-            { phase: "Day 2", range: "05—08 · 4H15", text: "Decode wallets, narratives, tape, risk, and decisions.", color: "green", passed: modules.filter((module) => [5, 6, 7, 8].includes(module.number) && progress.completed.includes(module.id)).length, total: 4 },
+            { phase: "Day 1", range: "01—04 · 4H20", text: "Decode the game, money, lifecycle, and terminal screen.", color: "violet", passed: modules.filter((module) => [1, 2, 3, 4].includes(module.number) && progress.completed.includes(module.id)).length, total: 4 },
+            { phase: "Day 2", range: "05—08 · 5H15", text: "Decode wallets, narratives, tape, risk, and decisions.", color: "green", passed: modules.filter((module) => [5, 6, 7, 8].includes(module.number) && progress.completed.includes(module.id)).length, total: 4 },
             { phase: "Day 3", range: "UNSEEN LAB · 90–120M", text: "Translate terminals, annotate tape, and pass the readiness gate.", color: "cyan", passed: curriculum.vodLiterate ? 1 : 0, total: 1 },
             { phase: "Bonus Arsenal", range: "09—12 · OPTIONAL", text: "Study setup families, execution, automation, and full VOD replay.", color: "amber", passed: curriculum.bonusPassed, total: curriculum.bonusTotal },
           ].map((item) => (
@@ -881,11 +882,11 @@ function Curriculum({ progress, openModule, openReadiness, openFoundry }: { prog
       </section>
 
       <section className="curriculum-phase">
-        <div className="phase-divider"><span>Day 1 · Decode the market and screen · 3h20 lessons</span><i /></div>
+        <div className="phase-divider"><span>Day 1 · Decode the market and screen · 4h20 guided lessons</span><i /></div>
         {renderModuleCards(weekendCoreModules.filter((module) => module.weekendDay === 1))}
       </section>
       <section className="curriculum-phase">
-        <div className="phase-divider"><span>Day 2 · Decode participants and decisions · 4h15 lessons</span><i /></div>
+        <div className="phase-divider"><span>Day 2 · Decode participants and decisions · 5h15 guided lessons</span><i /></div>
         {renderModuleCards(weekendCoreModules.filter((module) => module.weekendDay === 2))}
       </section>
 
@@ -951,23 +952,33 @@ function ModuleView({
         </div>
       </header>
       <nav className="module-section-strip" aria-label="Module sections">{module.sections.map((section, itemIndex) => <a href={`#section-${itemIndex}`} key={section.title}><span>{String(itemIndex + 1).padStart(2, "0")}</span>{section.title}</a>)}</nav>
+      <div className="lesson-mode-banner">
+        <span>HOW TO USE THIS MODULE</span>
+        <p><strong>Start Here</strong> builds the beginner model and defines the language. <strong>Operator Depth</strong> adds the real-market caveats. Open each <strong>Stop &amp; Explain</strong> check before moving on.</p>
+      </div>
       {module.id === "tape" && <CandlePrimer onOpenLab={() => openLab("candles")} />}
 
       <div className="lesson-layout">
         <article className="lesson-content">
-          {module.sections.map((section, sectionIndex) => (
-            <section className="lesson-section" id={`section-${sectionIndex}`} key={section.title}>
-              <div className="lesson-number">{String(sectionIndex + 1).padStart(2, "0")}</div>
-              <p className="section-kicker">{section.eyebrow}</p>
-              <h2>{section.title}</h2>
-              {section.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-              {section.bullets && <ul>{section.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>}
-              {section.formula && <div className="formula-card"><span>MODEL</span><code>{section.formula}</code></div>}
-              {section.example && <div className="example-card"><span>OPERATOR EXAMPLE</span><p>{section.example}</p></div>}
-              {section.warning && <div className="warning-card"><span>⚠ FIELD NOTE</span><p>{section.warning}</p></div>}
-              {section.sources && <SourceChips ids={section.sources} />}
-            </section>
-          ))}
+          {module.sections.map((section, sectionIndex) => {
+            const guide = lessonGuides[lessonGuideKey(module.id, sectionIndex)];
+            return (
+              <section className="lesson-section" id={`section-${sectionIndex}`} key={section.title}>
+                <div className="lesson-number">{String(sectionIndex + 1).padStart(2, "0")}</div>
+                <p className="section-kicker">{section.eyebrow}</p>
+                <h2>{section.title}</h2>
+                {guide && <LessonGuideIntro guide={guide} />}
+                <div className="operator-depth"><span>OPERATOR DEPTH</span></div>
+                {section.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+                {section.bullets && <ul>{section.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>}
+                {section.formula && <div className="formula-card"><span>MODEL</span><code>{section.formula}</code></div>}
+                {section.example && <div className="example-card"><span>OPERATOR EXAMPLE</span><p>{section.example}</p></div>}
+                {section.warning && <div className="warning-card"><span>⚠ FIELD NOTE</span><p>{section.warning}</p></div>}
+                {guide && <LessonCheckpoint guide={guide} />}
+                {section.sources && <SourceChips ids={section.sources} />}
+              </section>
+            );
+          })}
 
           <TrenchDecoder moduleId={module.id} />
 
@@ -992,6 +1003,51 @@ function ModuleView({
         </aside>
       </div>
     </div>
+  );
+}
+
+function LessonGuideIntro({ guide }: { guide: LessonGuide }) {
+  return (
+    <div className="lesson-guide">
+      <div className="lesson-guide-copy">
+        <span>START HERE · PLAIN ENGLISH</span>
+        <p>{guide.plainEnglish}</p>
+      </div>
+      {guide.terms && guide.terms.length > 0 && (
+        <dl className="lesson-terms">
+          {guide.terms.map((item) => (
+            <div key={item.term}>
+              <dt>{item.term}</dt>
+              <dd>{item.meaning}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {guide.walkthrough && (
+        <div className="lesson-walkthrough">
+          <span>WORK IT THROUGH</span>
+          <h3>{guide.walkthrough.title}</h3>
+          <ol>
+            {guide.walkthrough.steps.map((step, index) => (
+              <li key={step}><b>{String(index + 1).padStart(2, "0")}</b><p>{step}</p></li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LessonCheckpoint({ guide }: { guide: LessonGuide }) {
+  return (
+    <details className="lesson-checkpoint">
+      <summary>
+        <span>STOP &amp; EXPLAIN</span>
+        <strong>{guide.checkpoint.prompt}</strong>
+        <b>Reveal model answer</b>
+      </summary>
+      <div><p>{guide.checkpoint.answer}</p></div>
+    </details>
   );
 }
 

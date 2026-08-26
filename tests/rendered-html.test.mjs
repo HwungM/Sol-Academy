@@ -92,6 +92,57 @@ test("ships the complete course corpus without private screenshot material", asy
   await assert.rejects(access(new URL("../app/_sites-preview/preview.css", import.meta.url)));
 });
 
+test("ships a complete beginner teaching guide for every course section", async () => {
+  const guideSpecs = [
+    {
+      name: "Day 1",
+      path: "../app/data/lesson-guides-day1.ts",
+      moduleIds: ["game-map", "money-math", "lifecycle", "terminal"],
+    },
+    {
+      name: "Day 2",
+      path: "../app/data/lesson-guides-day2.ts",
+      moduleIds: ["wallets", "narrative", "tape", "risk"],
+    },
+    {
+      name: "Bonus",
+      path: "../app/data/lesson-guides-bonus.ts",
+      moduleIds: ["setups", "execution", "automation", "vod-capstone"],
+    },
+  ];
+  const [guideSources, app] = await Promise.all([
+    Promise.all(guideSpecs.map(({ path }) => readFile(new URL(path, import.meta.url), "utf8"))),
+    readFile(new URL("../app/AcademyApp.tsx", import.meta.url), "utf8"),
+  ]);
+  const expectedAllKeys = guideSpecs
+    .flatMap(({ moduleIds }) => moduleIds.flatMap((moduleId) => [0, 1, 2, 3].map((index) => `${moduleId}:${index}`)))
+    .sort();
+  const allKeys = [];
+
+  for (const [index, source] of guideSources.entries()) {
+    const { name, moduleIds } = guideSpecs[index];
+    const keys = [...source.matchAll(/^\s{2}"([a-z][a-z0-9-]*:\d+)":\s*\{/gm)].map((match) => match[1]);
+    const expectedKeys = moduleIds.flatMap((moduleId) => [0, 1, 2, 3].map((sectionIndex) => `${moduleId}:${sectionIndex}`));
+
+    assert.equal(keys.length, 16, `${name} should contain exactly 16 guide keys`);
+    assert.equal(new Set(keys).size, 16, `${name} guide keys must be unique`);
+    assert.deepEqual([...keys].sort(), expectedKeys.sort(), `${name} should cover all four sections of its four modules`);
+    assert.equal((source.match(/^\s{4}plainEnglish:/gm) ?? []).length, keys.length, `${name} needs plain English for every guide`);
+    assert.equal((source.match(/^\s{4}checkpoint:/gm) ?? []).length, keys.length, `${name} needs a checkpoint for every guide`);
+    allKeys.push(...keys);
+  }
+
+  assert.equal(allKeys.length, 48, "the teaching layer should contain exactly 48 section guides");
+  assert.equal(new Set(allKeys).size, 48, "guide keys must remain unique across all three files");
+  assert.deepEqual([...allKeys].sort(), expectedAllKeys, "the teaching layer should cover every section of all 12 modules");
+
+  assert.match(app, /function LessonGuideIntro\(/);
+  assert.match(app, /<LessonGuideIntro guide=\{guide\} \/>/);
+  assert.match(app, /START HERE · PLAIN ENGLISH/);
+  assert.match(app, /STOP &amp; EXPLAIN/);
+  assert.match(app, /className="operator-depth"/);
+});
+
 test("ships isolated ChatGPT cloud progress with a resilient local fallback", async () => {
   const [hostingText, auth, route, schema, migration, app, readme] = await Promise.all([
     readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
